@@ -28,7 +28,7 @@ void main() {
         'totalAmount': '2500.00',
         'currency': 'ETB',
         'placedAt': '2026-11-24T10:30:00.000Z',
-        'branch': {'name': 'Bole'},
+        'branch': {'name': 'Dire Dawa'},
         'customer': {
           'user': {'firstName': 'Dawa', 'lastName': 'Tesfaye'},
         },
@@ -52,7 +52,7 @@ void main() {
     );
 
     expect(order.bookingCode, 'LST-1001');
-    expect(order.branchName, 'Bole');
+    expect(order.branchName, 'Dire Dawa');
     expect(order.customerName, 'Dawa Tesfaye');
     expect(order.itemCount, 1);
     expect(order.items.single.shoeCategory, 'Sneakers');

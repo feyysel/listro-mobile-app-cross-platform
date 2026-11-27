@@ -37,7 +37,7 @@ class _BookingScreenState extends State<BookingScreen> {
   final _customerNotes = TextEditingController();
   final _addressLabel = TextEditingController(text: 'Home');
   final _addressLine = TextEditingController();
-  final _city = TextEditingController(text: 'Addis Ababa');
+  final _city = TextEditingController(text: 'Dire Dawa');
   final _subCity = TextEditingController();
   final _phone = TextEditingController();
   List<AddressModel> _addresses = [];
