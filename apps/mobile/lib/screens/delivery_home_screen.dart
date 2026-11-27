@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../models.dart';
+import '../roles.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'order_detail_screen.dart';
@@ -19,11 +22,19 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
   String? _error;
   bool _busy = false;
   bool _initialLoading = true;
+  Timer? _pollTimer;
 
   @override
   void initState() {
     super.initState();
     _loading = _load();
+    _pollTimer = Timer.periodic(const Duration(seconds: 30), (_) => _load());
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -96,6 +107,21 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
     final user = ApiClient.instance.user;
     final active = _deliveries.where((item) => !item.isDone).toList();
     final done = _deliveries.where((item) => item.isDone).toList();
+    final role = AppRole.delivery;
+    final liveOrders = active.take(3).map(
+      (item) => LiveOrderItem(
+        orderId: item.orderId,
+        code: item.order?.bookingCode ?? 'Order ${item.orderId}',
+        status: item.status,
+        detail: [
+          item.isPickup ? 'Pickup' : 'Return delivery',
+          item.order?.customerName ?? item.assigneeName ?? '',
+          item.location,
+        ].where((value) => value.isNotEmpty).join(' · '),
+        amount: item.order?.totalAmount,
+        currency: item.order?.currency ?? 'ETB',
+      ),
+    ).toList();
 
     return Scaffold(
       body: RefreshIndicator(
@@ -154,6 +180,16 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
                             message: _error!,
                             onRetry: () => setState(() => _loading = _load()),
                           ),
+                        LiveOrderCard(
+                          title: AppRole.liveTitle(role),
+                          subtitle: AppRole.liveSubtitle(role),
+                          items: liveOrders,
+                          onTap: (orderId) => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => OrderDetailScreen(orderId: orderId),
+                            ),
+                          ),
+                        ),
                         const SectionHeader(title: 'Active tasks'),
                         const SizedBox(height: 10),
                         if (loading)

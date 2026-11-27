@@ -6,14 +6,17 @@ import {
   Eye,
   EyeOff,
   LoaderCircle,
+  Moon,
   ShieldCheck,
   Sparkles,
+  Sun,
   Truck,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api, ApiError, setSession } from '@/lib/api';
+import { readThemePreference, themeIsDark, toggleTheme } from '@/lib/theme';
 
 interface LoginResponse {
   accessToken: string;
@@ -36,6 +39,11 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [dark, setDark] = useState(false);
+
+  useEffect(() => {
+    setDark(themeIsDark(readThemePreference()));
+  }, []);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -61,6 +69,15 @@ export default function LoginPage() {
 
   return (
     <main className="login-page">
+      <button
+        type="button"
+        className="icon-button theme-floating"
+        onClick={() => setDark(toggleTheme())}
+        aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+        aria-pressed={dark}
+      >
+        {dark ? <Sun size={18} /> : <Moon size={18} />}
+      </button>
       <section className="login-side">
         <div className="brand">
           <div className="brand-mark">

@@ -41,6 +41,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final user = ApiClient.instance.user;
+    final dark = AppThemeController.isDark(context);
     return Scaffold(
       appBar: AppBar(title: const Text('Profile')),
       body: ListView(
@@ -101,16 +102,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(height: 22),
           const Text('Account', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
           const SizedBox(height: 10),
-          const Card(
+          Card(
             child: Column(
               children: [
-                ListTile(
+                const ListTile(
                   leading: Icon(Icons.badge_outlined, color: AppColors.primary),
                   title: Text('Customer ID'),
                   subtitle: Text('Managed securely by Listro'),
                 ),
-                Divider(height: 1),
-                ListTile(
+                const Divider(height: 1),
+                SwitchListTile(
+                  secondary: Icon(
+                    dark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                    color: AppColors.primary,
+                  ),
+                  title: const Text('Dark mode'),
+                  subtitle: const Text('Switch between light and dark appearance'),
+                  value: dark,
+                  onChanged: (_) => AppThemeController.setMode(
+                    dark ? ThemeMode.light : ThemeMode.dark,
+                  ),
+                ),
+                const Divider(height: 1),
+                const ListTile(
                   leading: Icon(Icons.shield_outlined, color: AppColors.teal),
                   title: Text('Privacy & security'),
                   subtitle: Text('Your data is protected'),

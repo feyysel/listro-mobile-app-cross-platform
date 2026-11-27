@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../models.dart';
+import '../roles.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'booking_screen.dart';
@@ -22,11 +25,19 @@ class _HomeScreenState extends State<HomeScreen> {
   List<AddressModel> _addresses = [];
   List<OrderModel> _orders = [];
   String? _error;
+  Timer? _pollTimer;
 
   @override
   void initState() {
     super.initState();
     _loading = _load();
+    _pollTimer = Timer.periodic(const Duration(seconds: 30), (_) => _load());
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -90,6 +101,22 @@ class _HomeScreenState extends State<HomeScreen> {
     final user = ApiClient.instance.user;
     final activeOrders = _orders.where((order) => !['DELIVERED', 'CANCELLED', 'REJECTED'].contains(order.status)).toList();
     final latest = activeOrders.isNotEmpty ? activeOrders.first : null;
+    final role = user?.role ?? AppRole.customer;
+    final liveOrders = _orders
+        .where((order) => AppRole.liveStatuses(role).contains(order.status))
+        .take(3)
+        .map(
+          (order) => LiveOrderItem(
+            orderId: order.id,
+            code: order.bookingCode,
+            status: order.status,
+            detail: '${order.itemCount} item(s) · ${order.customerName}',
+            placedAt: order.placedAt,
+            amount: order.totalAmount,
+            currency: order.currency,
+          ),
+        )
+        .toList();
 
     return Scaffold(
       body: RefreshIndicator(
@@ -189,6 +216,19 @@ class _HomeScreenState extends State<HomeScreen> {
                             message: _error!,
                             onRetry: () => setState(() => _loading = _load()),
                           ),
+                        LiveOrderCard(
+                          title: AppRole.liveTitle(role),
+                          subtitle: AppRole.liveSubtitle(role),
+                          items: liveOrders,
+                          onSeeAll: () => Navigator.of(context).push(
+                            MaterialPageRoute(builder: (_) => const OrdersScreen()),
+                          ),
+                          onTap: (orderId) => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => OrderDetailScreen(orderId: orderId),
+                            ),
+                          ),
+                        ),
                         _QuickActions(
                           onBook: () {
                             if (_services.isNotEmpty) _openBooking(_services.first);
@@ -301,8 +341,9 @@ class _ActionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Material(
-      color: Colors.white,
+      color: colors.surface,
       borderRadius: BorderRadius.circular(20),
       child: InkWell(
         onTap: onTap,
@@ -311,7 +352,7 @@ class _ActionTile extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFFE7EAF0)),
+            border: Border.all(color: colors.outline.withValues(alpha: 0.35)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -367,15 +408,17 @@ class _ActiveOrderCard extends StatelessWidget {
                 style: const TextStyle(color: AppColors.muted, fontSize: 12),
               ),
               const SizedBox(height: 16),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(999),
-                child: const LinearProgressIndicator(
-                  value: 0.45,
-                  minHeight: 7,
-                  backgroundColor: Color(0xFFEEF0F5),
-                  color: AppColors.primary,
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: LinearProgressIndicator(
+                    value: workflowProgress(order.status),
+                    minHeight: 7,
+                    backgroundColor: AppThemeController.isDark(context)
+                        ? const Color(0xFF26314A)
+                        : const Color(0xFFEEF0F5),
+                    color: AppColors.primary,
+                  ),
                 ),
-              ),
               const SizedBox(height: 10),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,

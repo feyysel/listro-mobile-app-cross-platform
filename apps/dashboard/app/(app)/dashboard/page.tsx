@@ -7,6 +7,7 @@ import {
   Clock3,
   Droplets,
   Package,
+  RefreshCw,
   Sparkles,
   Truck,
 } from 'lucide-react';
@@ -15,11 +16,55 @@ import { useCallback, useEffect, useState } from 'react';
 import { OrderDrawer } from '@/components/OrderDrawer';
 import { MiniBars, RevenueChart, StatusDonut } from '@/components/Charts';
 import { Card, dateTime, Empty, Loader, money, StatusBadge, StatCard, Toast } from '@/components/ui';
-import { api } from '@/lib/api';
-import type { DashboardMetrics, OrderSummary, Page as PageType } from '@/lib/types';
+import { api, getStoredUser } from '@/lib/api';
+import type {
+  DashboardMetrics,
+  OrderSummary,
+  Page as PageType,
+  Role,
+  SessionUser,
+} from '@/lib/types';
 
 type RevenueData = { byDay: Record<string, number>; total: number; count: number };
 type ServiceDatum = { name: string; orders: number; revenue: number };
+
+const activeStatuses = [
+  'PLACED',
+  'CONFIRMED',
+  'DELIVERY_ASSIGNED',
+  'PICKUP_IN_PROGRESS',
+  'RECEIVED_AT_CENTER',
+  'WASHING_IN_PROGRESS',
+  'WASHING_COMPLETED',
+  'READY_FOR_DELIVERY',
+  'OUT_FOR_DELIVERY',
+];
+
+const roleLiveStatuses: Record<Role, string[]> = {
+  CUSTOMER: activeStatuses,
+  OPERATOR: ['RECEIVED_AT_CENTER', 'WASHING_IN_PROGRESS', 'WASHING_COMPLETED'],
+  DELIVERY: [
+    'DELIVERY_ASSIGNED',
+    'PICKUP_IN_PROGRESS',
+    'READY_FOR_DELIVERY',
+    'OUT_FOR_DELIVERY',
+  ],
+  MANAGER: activeStatuses,
+  ADMIN: activeStatuses,
+};
+
+const roleLiveSubtitles: Record<Role, string> = {
+  CUSTOMER: 'Your orders that are still in progress',
+  OPERATOR: 'Orders waiting at the cleaning bench',
+  DELIVERY: 'Pickups and returns assigned to your route',
+  MANAGER: 'Active work across the branch',
+  ADMIN: 'Active work across all branches',
+};
+
+function liveOrdersForRole(orders: OrderSummary[], role?: Role) {
+  const statuses = role ? roleLiveStatuses[role] : activeStatuses;
+  return orders.filter((order) => statuses.includes(order.status)).slice(0, 4);
+}
 
 export default function DashboardPage() {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
@@ -30,21 +75,24 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [drawerId, setDrawerId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; error?: boolean } | null>(null);
+  const [role, setRole] = useState<Role | undefined>(undefined);
 
   const notify = useCallback((message: string, error?: boolean) => {
     setToast({ message, error });
     window.setTimeout(() => setToast(null), 3200);
   }, []);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const refresh = useCallback(async (silent = false) => {
+    if (!silent) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       const [metricData, orderData, revenueData, serviceData] = await Promise.all([
         api<DashboardMetrics>('/reports/dashboard'),
-        api<PageType<OrderSummary>>('/orders?limit=6').catch(() => ({
+        api<PageType<OrderSummary>>('/orders?limit=40').catch(() => ({
           items: [],
-          meta: { page: 1, limit: 6, total: 0, pages: 0 },
+          meta: { page: 1, limit: 40, total: 0, pages: 0 },
         })),
         api<RevenueData>('/reports/revenue').catch(() => ({ byDay: {}, total: 0, count: 0 })),
         api<ServiceDatum[]>('/reports/services').catch(() => []),
@@ -56,14 +104,20 @@ export default function DashboardPage() {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to load dashboard';
       setError(message);
-      notify(message, true);
+      if (!silent) notify(message, true);
     } finally {
       setLoading(false);
     }
   }, [notify]);
 
   useEffect(() => {
+    setRole(getStoredUser<SessionUser>()?.role);
+  }, []);
+
+  useEffect(() => {
     void refresh();
+    const timer = window.setInterval(() => void refresh(true), 30000);
+    return () => window.clearInterval(timer);
   }, [refresh]);
 
   const activeOrders = metrics
@@ -71,6 +125,7 @@ export default function DashboardPage() {
         .filter(([status]) => !['DELIVERED', 'CANCELLED', 'REJECTED'].includes(status))
         .reduce((sum, [, count]) => sum + count, 0)
     : 0;
+  const liveOrders = liveOrdersForRole(orders, role);
 
   if (loading) return <Loader label="Preparing your workspace…" />;
 
@@ -104,6 +159,42 @@ export default function DashboardPage() {
           </Link>
         </div>
       </div>
+
+      <Card
+        title="Live orders"
+        subtitle={role ? roleLiveSubtitles[role] : 'Active work across your workspace'}
+        action={
+          <button className="link-button" onClick={() => void refresh(true)}>
+            <RefreshCw size={14} /> Refresh
+          </button>
+        }
+        bodyClassName="live-order-body"
+      >
+        {liveOrders.length === 0 ? (
+          <Empty title="Nothing needs attention" message="Live orders for your role will appear here." />
+        ) : (
+          <div className="live-order-list">
+            {liveOrders.map((order) => (
+              <button
+                key={order.id}
+                type="button"
+                className="live-order-row"
+                onClick={() => setDrawerId(order.id)}
+              >
+                <div className="live-order-main">
+                  <span className="live-order-code">{order.bookingCode}</span>
+                  <span className="live-order-meta">
+                    {order.customer.user.firstName} {order.customer.user.lastName ?? ''} ·{' '}
+                    {order._count.items} item(s) · {dateTime(order.placedAt)}
+                  </span>
+                </div>
+                <StatusBadge status={order.status} />
+                <span className="live-order-amount">{money(order.totalAmount, order.currency)}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </Card>
 
       <div className="stat-grid">
         <StatCard
@@ -169,7 +260,7 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {orders.map((order) => (
+                {orders.slice(0, 6).map((order) => (
                   <tr key={order.id} onClick={() => setDrawerId(order.id)} style={{ cursor: 'pointer' }}>
                     <td className="cell-strong">{order.bookingCode}</td>
                     <td>

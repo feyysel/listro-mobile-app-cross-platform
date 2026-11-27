@@ -9,9 +9,11 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  Moon,
   PackageCheck,
   Settings,
   Sparkles,
+  Sun,
   Truck,
   Users,
   X,
@@ -20,6 +22,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { api, clearSession, getStoredUser, getToken } from '@/lib/api';
+import { readThemePreference, themeIsDark, toggleTheme } from '@/lib/theme';
 import type { Role, SessionUser } from '@/lib/types';
 
 interface NavItem {
@@ -56,6 +59,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [search, setSearch] = useState('');
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Array<{ id: string; title: string; message: string; createdAt: string }>>([]);
+  const [dark, setDark] = useState(false);
+
+  useEffect(() => {
+    setDark(themeIsDark(readThemePreference()));
+  }, []);
 
   useEffect(() => {
     if (!getToken()) {
@@ -153,6 +161,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="topbar-actions">
+            <button
+              className="icon-button"
+              onClick={() => setDark(toggleTheme())}
+              aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+              aria-pressed={dark}
+            >
+              {dark ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
             <div style={{ position: 'relative' }}>
               <button
                 className="icon-button"

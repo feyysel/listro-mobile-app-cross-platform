@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../models.dart';
+import '../roles.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'order_detail_screen.dart';
@@ -19,11 +22,19 @@ class _OperatorHomeScreenState extends State<OperatorHomeScreen> {
   String? _error;
   bool _busy = false;
   bool _initialLoading = true;
+  Timer? _pollTimer;
 
   @override
   void initState() {
     super.initState();
     _loading = _load();
+    _pollTimer = Timer.periodic(const Duration(seconds: 30), (_) => _load());
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -84,6 +95,15 @@ class _OperatorHomeScreenState extends State<OperatorHomeScreen> {
     final user = ApiClient.instance.user;
     final active = _tasks.where((task) => !task.isCompleted).toList();
     final completed = _tasks.where((task) => task.isCompleted).toList();
+    final role = AppRole.operator;
+    final liveOrders = active.take(3).map(
+      (task) => LiveOrderItem(
+        orderId: task.orderId,
+        code: task.bookingCode ?? task.orderId,
+        status: task.status,
+        detail: '${task.serviceName} · ${task.shoeCategory} · Qty ${task.quantity}',
+      ),
+    ).toList();
     final readyOrders = <String>{};
     for (final task in _tasks) {
       readyOrders.add(task.orderId);
@@ -150,6 +170,16 @@ class _OperatorHomeScreenState extends State<OperatorHomeScreen> {
                             message: _error!,
                             onRetry: () => setState(() => _loading = _load()),
                           ),
+                        LiveOrderCard(
+                          title: AppRole.liveTitle(role),
+                          subtitle: AppRole.liveSubtitle(role),
+                          items: liveOrders,
+                          onTap: (orderId) => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => OrderDetailScreen(orderId: orderId),
+                            ),
+                          ),
+                        ),
                         const SectionHeader(title: 'Assigned shoes'),
                         const SizedBox(height: 10),
                         if (loading)

@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../models.dart';
+import '../roles.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'order_detail_screen.dart';
@@ -23,11 +26,19 @@ class _ManagerHomeScreenState extends State<ManagerHomeScreen> {
   String? _error;
   bool _busy = false;
   bool _initialLoading = true;
+  Timer? _pollTimer;
 
   @override
   void initState() {
     super.initState();
     _loading = _load();
+    _pollTimer = Timer.periodic(const Duration(seconds: 30), (_) => _load());
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -104,6 +115,22 @@ class _ManagerHomeScreenState extends State<ManagerHomeScreen> {
   @override
   Widget build(BuildContext context) {
     final user = ApiClient.instance.user;
+    final role = user?.role ?? AppRole.manager;
+    final liveOrders = _orders
+        .where((order) => AppRole.liveStatuses(role).contains(order.status))
+        .take(3)
+        .map(
+          (order) => LiveOrderItem(
+            orderId: order.id,
+            code: order.bookingCode,
+            status: order.status,
+            detail: '${order.customerName} · ${order.itemCount} item(s)',
+            placedAt: order.placedAt,
+            amount: order.totalAmount,
+            currency: order.currency,
+          ),
+        )
+        .toList();
     final placed = _orders.where((order) => order.status == 'PLACED').toList();
     final confirmed = _orders.where((order) => order.status == 'CONFIRMED').toList();
     final unassignedTasks =
@@ -173,6 +200,16 @@ class _ManagerHomeScreenState extends State<ManagerHomeScreen> {
                             message: _error!,
                             onRetry: () => setState(() => _loading = _load()),
                           ),
+                        LiveOrderCard(
+                          title: AppRole.liveTitle(role),
+                          subtitle: AppRole.liveSubtitle(role),
+                          items: liveOrders,
+                          onTap: (orderId) => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => OrderDetailScreen(orderId: orderId),
+                            ),
+                          ),
+                        ),
                         const SectionHeader(title: 'Waiting for confirmation'),
                         const SizedBox(height: 10),
                         if (loading)

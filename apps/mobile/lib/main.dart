@@ -9,6 +9,7 @@ import 'theme.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await ApiClient.instance.init();
+  await AppThemeController.init();
   runApp(const ListroApp());
 }
 
@@ -17,13 +18,20 @@ class ListroApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Listro',
-      theme: AppTheme.light(),
-      home: SplashScreen(
-        next: ApiClient.instance.isSignedIn ? const MainShell() : const LoginScreen(),
-      ),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: AppThemeController.mode,
+      builder: (context, mode, _) {
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          title: 'Listro',
+          theme: AppTheme.light(),
+          darkTheme: AppTheme.dark(),
+          themeMode: mode,
+          home: SplashScreen(
+            next: ApiClient.instance.isSignedIn ? const MainShell() : const LoginScreen(),
+          ),
+        );
+      },
     );
   }
 }

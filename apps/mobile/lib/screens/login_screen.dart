@@ -18,9 +18,11 @@ class _LoginScreenState extends State<LoginScreen> {
   final _firstName = TextEditingController();
   final _lastName = TextEditingController();
   final _phone = TextEditingController();
+  final _confirmPassword = TextEditingController();
   bool _registering = false;
   bool _loading = false;
   bool _obscure = true;
+  bool _confirmObscure = true;
   String? _error;
 
   @override
@@ -30,7 +32,37 @@ class _LoginScreenState extends State<LoginScreen> {
     _firstName.dispose();
     _lastName.dispose();
     _phone.dispose();
+    _confirmPassword.dispose();
     super.dispose();
+  }
+
+  int _passwordScore(String value) {
+    var score = 0;
+    if (value.length >= 8) score++;
+    if (value.length >= 12) score++;
+    if (RegExp(r'[A-Z]').hasMatch(value)) score++;
+    if (RegExp(r'[a-z]').hasMatch(value)) score++;
+    if (RegExp(r'[0-9]').hasMatch(value)) score++;
+    if (RegExp(r'[^A-Za-z0-9]').hasMatch(value)) score++;
+    return score;
+  }
+
+  void _toggleMode() {
+    setState(() {
+      _registering = !_registering;
+      _error = null;
+      _firstName.clear();
+      _lastName.clear();
+      _phone.clear();
+      _confirmPassword.clear();
+      if (_registering) {
+        _email.clear();
+        _password.clear();
+      } else {
+        _email.text = 'customer@listro.test';
+        _password.text = 'Customer@123';
+      }
+    });
   }
 
   Future<void> _submit() async {
@@ -64,6 +96,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
@@ -177,6 +210,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       TextFormField(
                         controller: _password,
                         obscureText: _obscure,
+                        onChanged: _registering ? (_) => setState(() {}) : null,
                         decoration: InputDecoration(
                           labelText: 'Password',
                           suffixIcon: IconButton(
@@ -184,8 +218,33 @@ class _LoginScreenState extends State<LoginScreen> {
                             onPressed: () => setState(() => _obscure = !_obscure),
                           ),
                         ),
-                        validator: (value) => value == null || value.length < 8 ? 'At least 8 characters' : null,
+                        validator: (value) {
+                          if (value == null || value.length < 8) return 'At least 8 characters';
+                          if (_registering && _passwordScore(value) < 4) {
+                            return 'Use upper, lower and a number';
+                          }
+                          return null;
+                        },
                       ),
+                      if (_registering) ...[
+                        const SizedBox(height: 10),
+                        _PasswordStrength(score: _passwordScore(_password.text)),
+                        const SizedBox(height: 14),
+                        TextFormField(
+                          controller: _confirmPassword,
+                          obscureText: _confirmObscure,
+                          decoration: InputDecoration(
+                            labelText: 'Confirm password',
+                            suffixIcon: IconButton(
+                              icon: Icon(_confirmObscure ? Icons.visibility : Icons.visibility_off),
+                              onPressed: () => setState(() => _confirmObscure = !_confirmObscure),
+                            ),
+                          ),
+                          validator: (value) => value == _password.text
+                              ? null
+                              : 'Passwords do not match',
+                        ),
+                      ],
                       if (_error != null) ...[
                         const SizedBox(height: 12),
                         Text(_error!, style: const TextStyle(color: AppColors.rose, fontSize: 12)),
@@ -203,10 +262,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 16),
                       TextButton(
-                        onPressed: () => setState(() {
-                          _registering = !_registering;
-                          _error = null;
-                        }),
+                        onPressed: _toggleMode,
                         child: Text(_registering
                             ? 'Already have an account? Sign in'
                             : 'New to Listro? Create an account'),
@@ -216,18 +272,18 @@ class _LoginScreenState extends State<LoginScreen> {
                           margin: const EdgeInsets.only(top: 18),
                           padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: colors.surface,
                             borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: const Color(0xFFE7EAF0)),
+                            border: Border.all(color: colors.outline.withValues(alpha: 0.35)),
                           ),
-                          child: const Column(
+                          child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Demo customer', style: TextStyle(fontWeight: FontWeight.w700)),
-                              SizedBox(height: 4),
+                              const Text('Demo customer', style: TextStyle(fontWeight: FontWeight.w700)),
+                              const SizedBox(height: 4),
                               Text(
                                 'customer@listro.test · Customer@123',
-                                style: TextStyle(color: AppColors.muted, fontSize: 12),
+                                style: TextStyle(color: colors.onSurface.withValues(alpha: 0.6), fontSize: 12),
                               ),
                             ],
                           ),
@@ -240,6 +296,66 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _PasswordStrength extends StatelessWidget {
+  final int score;
+
+  const _PasswordStrength({required this.score});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final filled = score >= 5 ? 4 : score >= 4 ? 3 : score >= 2 ? 2 : score >= 1 ? 1 : 0;
+    final color = score >= 5
+        ? AppColors.green
+        : score >= 4
+            ? AppColors.teal
+            : score >= 2
+                ? AppColors.amber
+                : AppColors.rose;
+    final label = score >= 5
+        ? 'Strong'
+        : score >= 4
+            ? 'Good'
+            : score >= 2
+                ? 'Fair'
+                : 'Weak';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Text('Password strength', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+            const Spacer(),
+            Text(label, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w700)),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            for (var index = 1; index <= 4; index++)
+              Expanded(
+                child: Container(
+                  height: 5,
+                  margin: EdgeInsets.only(right: index == 4 ? 0 : 6),
+                  decoration: BoxDecoration(
+                    color: index <= filled ? color : colors.outline.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 5),
+        Text(
+          'Use 8+ characters with upper, lower and a number.',
+          style: TextStyle(color: colors.onSurface.withValues(alpha: 0.55), fontSize: 10),
+        ),
+      ],
     );
   }
 }
