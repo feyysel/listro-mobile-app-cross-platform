@@ -1,0 +1,1148 @@
+LISTRO PROJECT REQUIREMENTS AND TECHNICAL DESIGN DOCUMENT Version: 1.0
+Date: 24 November 2026 Status: Initial project baseline
+
+====================================================================== 1.
+PROJECT OVERVIEW
+======================================================================
+
+1.1 Project name Listro
+
+1.2 Product concept Listro is a shoe-cleaning and shoe-care service
+platform. Customers request shoe-cleaning services through a mobile
+application. Listro arranges collection of the shoes, transports them to
+a washing/cleaning center, processes them, and returns the cleaned shoes
+to the customer.
+
+The platform coordinates customers, delivery personnel, cleaning-center
+operators, managers, and administrators. It provides order management,
+service selection, pickup and return delivery, shoe inspection, cleaning
+workflow tracking, payment recording, notifications, reporting, and
+operational administration.
+
+1.3 Main business objective Build a reliable, maintainable, secure, and
+scalable digital platform that makes it easy for customers to request
+shoe cleaning and gives Listro staff clear visibility and control over
+every order from placement to delivery.
+
+1.4 Product goals - Make ordering shoe-cleaning services simple for
+customers. - Support pickup from the customer’s address and return
+delivery. - Track every order through clearly defined operational
+stages. - Record the condition of shoes before cleaning and, where
+appropriate, after cleaning. - Assign delivery and cleaning tasks to
+responsible employees. - Support cash and online payment methods. - Give
+managers operational dashboards and reports. - Give administrators
+control over users, roles, services, branches, and system settings. -
+Preserve a reliable history of order status changes and employee
+actions. - Allow the business to start with one cleaning center while
+supporting multiple branches in the future.
+
+1.5 Initial scope The initial release is intended for one operating
+cleaning center. The database and backend should be designed so
+additional branches can be introduced later without rebuilding the core
+system.
+
+The project is a modular monolith initially, not a microservices system.
+This keeps development and deployment manageable while maintaining clear
+module boundaries.
+
+======================================================================
+2. USERS, ROLES, AND RESPONSIBILITIES
+======================================================================
+
+2.1 Customer The customer uses the Flutter mobile application to: -
+Register and sign in. - Manage their profile and contact details. - Add,
+edit, and select pickup/return addresses. - Browse available
+shoe-cleaning services and prices. - Add one or more pairs of shoes to
+an order. - Select a service for each pair. - Provide shoe details and
+special instructions. - Select a preferred pickup date/time, subject to
+availability. - Review the order and estimated total. - Submit an
+order. - View order details and current status. - Follow pickup,
+cleaning, and return-delivery progress. - Receive order and payment
+notifications. - View payment status and order history. - Contact Listro
+support through the channels provided by the business. - Cancel an order
+when the cancellation policy and current order state allow it. - Submit
+feedback or a rating if this feature is enabled.
+
+2.2 Delivery personnel Delivery personnel use the Flutter mobile
+application to: - Sign in with an employee account. - View deliveries
+assigned to them. - View the delivery type: customer pickup or return
+delivery. - View the customer name, contact information, address, and
+relevant instructions. - View navigation/location information when a
+maps integration is enabled. - Accept or acknowledge an assignment if
+the business workflow requires it. - Update delivery progress. - Confirm
+that shoes were collected from the customer. - Record a failed pickup or
+delivery with a reason. - Confirm handover of shoes to the cleaning
+center. - Receive return-delivery assignments after cleaning is
+complete. - Confirm that cleaned shoes were returned to the customer. -
+View their own completed and active assignments.
+
+The system should record who performed each delivery action and when it
+occurred. Employee location should only be collected when necessary for
+an active work task and in accordance with the business privacy policy.
+The system must not track employees outside their work assignments.
+
+2.3 Operator Operators use the Flutter mobile application to: - Sign in
+with an operator account. - View shoes/orders received at the cleaning
+center. - Confirm physical receipt of shoes. - Review customer-provided
+notes and delivery information. - Perform and record a shoe condition
+inspection. - Capture before-cleaning photos where supported. - Record
+existing damage, stains, missing accessories, or other relevant
+observations. - View the cleaning service selected for each pair. -
+Start and update cleaning tasks. - Record operational notes or issues. -
+Mark cleaning as completed. - Capture after-cleaning photos where
+supported. - Mark shoes as ready for return delivery. - Hand shoes over
+to delivery personnel and record the handover.
+
+2.4 Manager Managers can use the Flutter mobile application and the
+Next.js web management dashboard.
+
+Manager capabilities: - View the operational dashboard. - View and
+manage orders for authorized branches. - Confirm or reject orders
+according to business policy. - Assign and reassign delivery
+personnel. - Assign cleaning tasks to operators. - Monitor pickup,
+cleaning, and return-delivery progress. - Review shoe inspection records
+and operational exceptions. - Manage daily workload and employee
+assignments. - View customers and relevant customer order history. -
+Review payments and payment exceptions. - Manage service availability
+and pricing where permitted. - View operational reports. - Handle
+cancellations, failed deliveries, complaints, and order issues. -
+Monitor employee activity and workload. - View audit history relevant to
+their permissions.
+
+Managers must not automatically receive every administrator permission.
+Their access should be limited by role and branch assignment.
+
+2.5 Administrator / Owner Administrators have the highest level of
+system access. They can use the Flutter mobile application and the
+Next.js web management dashboard.
+
+Administrator capabilities: - Manage users and employee accounts. -
+Assign roles and permissions. - Activate, deactivate, or suspend
+accounts. - Manage branches and branch details. - Manage services,
+service descriptions, prices, and availability. - Configure business
+settings and operating rules. - View and manage all orders. - View and
+manage customers and employees. - Review all payment records and payment
+exceptions. - View business-wide reports and analytics. - Review audit
+logs. - Configure notification and integration settings. - Manage
+system-level settings and access policies.
+
+High-impact actions should be permission-controlled and recorded in the
+audit log.
+
+2.6 Support role A dedicated support role is not mandatory for the first
+release. If introduced, it should have restricted access to customer
+inquiries, order details, and support actions without receiving
+financial or system-administration permissions by default.
+
+======================================================================
+3. TARGET APPLICATIONS AND PLATFORMS
+======================================================================
+
+3.1 Mobile application One Flutter application for Android and iOS.
+
+The same mobile application supports role-based experiences for: -
+Customer - Delivery personnel - Operator - Manager - Administrator
+
+After login, the backend-provided role and permissions determine which
+screens and actions are available. Hiding a button in the app is not
+sufficient security; the backend must enforce authorization on every
+protected operation.
+
+3.2 Web management dashboard A Next.js web application for: - Manager -
+Administrator / Owner
+
+The web dashboard provides larger-screen workflows for order management,
+employee management, services, branches, reports, and administration.
+
+3.3 Backend API A NestJS REST API provides shared business logic and
+data access for both mobile and web applications.
+
+3.4 Initial deployment model - Flutter mobile clients communicate with
+the hosted API over HTTPS. - Next.js dashboard communicates with the
+same API. - NestJS communicates with PostgreSQL and Redis. - Background
+workers process queued jobs. - Object storage stores photos and other
+uploaded files. - Push notifications are delivered through Firebase
+Cloud Messaging.
+
+======================================================================
+4. TECHNOLOGY STACK
+======================================================================
+
+4.1 Mobile application Framework: Flutter Language: Dart
+
+Recommended supporting technologies: - Riverpod: application state
+management and dependency injection. - GoRouter: navigation and route
+protection. - Dio: HTTP client for API requests, interceptors, and error
+handling. - Drift with SQLite: local database and selected offline
+capabilities. - Flutter Secure Storage: secure storage for
+authentication tokens. - Firebase Cloud Messaging: push notifications. -
+Google Maps or Mapbox: maps, address selection, and delivery
+navigation. - Image picker / camera packages: shoe inspection and order
+photos. - Flutter test: unit, widget, and integration testing.
+
+4.2 Backend Framework: NestJS Language: TypeScript Architecture: Modular
+monolith using feature modules.
+
+Recommended modules: - Authentication - Users - Customers - Employees -
+Roles and permissions - Branches - Addresses - Shoes - Services -
+Orders - Deliveries - Washing / cleaning tasks - Shoe inspections -
+Payments - Notifications - Reports - Audit logs - File uploads - Health
+checks
+
+4.3 Database Database: PostgreSQL ORM: Prisma ORM 7.10.1
+
+PostgreSQL is the authoritative persistent data store. Prisma provides
+schema management, type-safe database access, and migrations.
+
+The initial schema supports one active center while allowing multiple
+branches in the future.
+
+4.4 Cache and background jobs Redis: - Cache frequently requested data
+where appropriate. - Store short-lived operational data where
+appropriate. - Support background job infrastructure.
+
+BullMQ: - Process background jobs such as notification delivery,
+email/SMS tasks, report generation, and other work that should not block
+API requests. - Implement retries and failed-job handling. - Jobs must
+be safe to retry and should avoid duplicate business effects.
+
+4.5 Web dashboard Framework: Next.js Language: TypeScript
+
+Recommended supporting technologies: - React - A consistent component
+library such as shadcn/ui - A form library and schema validation
+library - TanStack Query or an equivalent server-state approach where
+useful - Responsive layouts and accessible components
+
+The dashboard must use the backend API rather than directly accessing
+the database.
+
+4.6 Authentication and security - Short-lived JWT access tokens. -
+Rotating refresh tokens with server-side revocation support. - Argon2id
+for password hashing. - Flutter Secure Storage for mobile token
+storage. - Secure, HttpOnly cookies for web refresh-token handling where
+appropriate. - Role-based access control (RBAC). - Permission checks in
+NestJS guards and service methods. - Rate limiting for sensitive
+endpoints. - Validation of all incoming request data. - HTTPS in
+production.
+
+4.7 File storage Use S3-compatible object storage for: - Shoe
+before/after photos. - Inspection photos. - Optional customer
+attachments. - Other business documents if required.
+
+Store file metadata and object keys in PostgreSQL, not large binary
+files. Use private storage by default and short-lived signed URLs for
+authorized access.
+
+4.8 Maps and location Google Maps or Mapbox may be used for: - Address
+search and selection. - Map display. - Delivery route assistance. -
+Optional active-delivery location sharing.
+
+The provider and pricing must be evaluated before production selection.
+Do not collect more location data than the delivery workflow requires.
+
+4.9 Notifications Firebase Cloud Messaging for mobile push
+notifications.
+
+The backend should create notification records and dispatch messages
+through background jobs. Push delivery is not guaranteed, so important
+order updates must also be visible in the application.
+
+Other channels, such as SMS or email, may be added after selecting
+providers and reviewing cost and local availability.
+
+4.10 Monitoring and deployment - Docker and Docker Compose for local
+infrastructure and repeatable environments. - Git and GitHub for source
+control. - GitHub Actions for automated checks and deployment
+workflows. - Sentry or an equivalent service for error monitoring. -
+Structured application logs. - Database backups and restore
+procedures. - Separate development, staging, and production
+environments.
+
+4.11 Initial development environment The current development environment
+is Windows with: - Flutter SDK - Node.js and npm - Android Studio -
+Git - Docker Desktop
+
+The repository is located at: C:
+
+The NestJS API is located at: C:
+
+The local Docker infrastructure currently uses: - PostgreSQL container:
+listro-postgres - PostgreSQL host port: 5432 - PostgreSQL database:
+listro_db - PostgreSQL user: listro_user - Redis container:
+listro-redis - Redis host port: 6380 - Redis container port: 6379
+
+Passwords belong in ignored environment files and must never be
+committed to Git.
+
+======================================================================
+5. HIGH-LEVEL SYSTEM ARCHITECTURE
+======================================================================
+
+5.1 Architecture overview
+
+Flutter Mobile Application | | HTTPS / REST API v NestJS Backend API
+<——> Next.js Management Dashboard | +—— PostgreSQL (Prisma ORM) | +——
+Redis | | | +—— BullMQ background jobs | +—— Object Storage | +——
+Firebase Cloud Messaging | +—— Maps provider (when enabled)
+
+5.2 Architectural principles - Modular monolith for the initial
+release. - Clear separation between controllers, services, data access,
+and domain rules. - Shared backend business rules for mobile and web
+clients. - PostgreSQL as the source of truth. - Backend-authoritative
+order status and payment status. - Explicit authorization for every
+protected operation. - Transactional database updates for operations
+that must succeed together. - Background jobs for slow or retryable
+work. - API versioning for future compatibility. - Avoid premature
+microservices. - Keep external integrations behind service abstractions
+so providers can be changed later.
+
+5.3 Suggested repository structure
+
+listro/ apps/ api/ NestJS backend mobile/ Flutter mobile application
+admin/ Next.js management dashboard packages/ api-contracts/ Shared API
+types/contracts if appropriate infrastructure/ docker/ Docker-related
+infrastructure scripts/ Development and deployment scripts docs/
+architecture/ database/ api/ docker-compose.yml .env.example .gitignore
+README.md
+
+The API folder already exists and the NestJS application has been
+created. The mobile and admin folders can be added as their development
+milestones begin.
+
+======================================================================
+6. FUNCTIONAL REQUIREMENTS
+======================================================================
+
+Functional requirements describe what the system must do.
+
+6.1 Authentication and account management
+
+FR-AUTH-01: A customer must be able to register using required account
+information. FR-AUTH-02: A user must be able to sign in. FR-AUTH-03: The
+system must identify the authenticated user. FR-AUTH-04: The backend
+must return the user’s role and permitted capabilities. FR-AUTH-05:
+Users must be able to sign out. FR-AUTH-06: The system must support
+refresh-token rotation and revocation. FR-AUTH-07: Users must be able to
+request password reset. FR-AUTH-08: Password-reset tokens must be
+time-limited and single-use. FR-AUTH-09: Administrators must be able to
+create and manage employee accounts. FR-AUTH-10: Administrators must be
+able to activate, deactivate, or suspend accounts. FR-AUTH-11:
+Authentication endpoints must be rate-limited. FR-AUTH-12: The system
+must not reveal whether an email address is registered during
+password-reset requests.
+
+6.2 Customer profile and addresses
+
+FR-CUST-01: Customers must be able to view and update permitted profile
+fields. FR-CUST-02: Customers must be able to add multiple addresses.
+FR-CUST-03: Customers must be able to edit and delete their saved
+addresses, subject to business rules. FR-CUST-04: Customers must be able
+to set a default address. FR-CUST-05: Address records should include
+useful delivery details such as city, area, street or landmark, and
+optional coordinates. FR-CUST-06: Staff must only access customer
+information required for their assigned work and permissions.
+
+6.3 Services and pricing
+
+FR-SVC-01: Customers must be able to browse available cleaning services.
+FR-SVC-02: Each service must have a name, description, price, and
+active/inactive status. FR-SVC-03: The system should support service
+categories or shoe-specific service options. FR-SVC-04: Managers or
+administrators with permission must be able to manage services.
+FR-SVC-05: Service availability may differ by branch. FR-SVC-06: The
+order must preserve the price used at the time of purchase so later
+price changes do not rewrite historical order totals. FR-SVC-07: The
+backend must calculate authoritative prices and totals.
+
+6.4 Shoes and order creation
+
+FR-ORD-01: A customer must be able to create an order containing one or
+more pairs of shoes. FR-ORD-02: Each pair must be represented as an
+order item. FR-ORD-03: Each order item must identify the shoe type or
+description and selected service. FR-ORD-04: Customers must be able to
+provide special instructions. FR-ORD-05: Customers must be able to
+select a pickup address. FR-ORD-06: Customers must be able to select a
+preferred pickup time or time window, subject to availability.
+FR-ORD-07: The system must show an order summary before submission.
+FR-ORD-08: The backend must validate service availability, address
+ownership, scheduling rules, and price. FR-ORD-09: The system must
+generate a unique human-readable booking/order reference. FR-ORD-10:
+Customers must be able to view their order history. FR-ORD-11: Managers
+must be able to search and filter orders. FR-ORD-12: An order must
+preserve the service name and unit price applicable when it was placed.
+FR-ORD-13: The system should prevent duplicate order submission caused
+by repeated network requests through idempotency controls where
+appropriate.
+
+6.5 Order confirmation and cancellation
+
+FR-ORD-14: New orders must be visible to authorized staff. FR-ORD-15: A
+manager or authorized workflow must be able to confirm or reject an
+order. FR-ORD-16: Rejection must include a reason. FR-ORD-17: Customers
+must be able to cancel an order only when the configured cancellation
+rules allow it. FR-ORD-18: The system must prevent cancellation after
+prohibited workflow stages unless an authorized manager handles an
+exception. FR-ORD-19: Every status change must be recorded with actor,
+timestamp, previous status, new status, and optional note. FR-ORD-20:
+The backend must validate all order status transitions.
+
+6.6 Pickup delivery workflow
+
+FR-DEL-01: A manager or authorized system workflow must assign a
+delivery person to a pickup. FR-DEL-02: The assigned delivery person
+must see the assignment in the mobile app. FR-DEL-03: The delivery
+person must be able to view the pickup address and instructions.
+FR-DEL-04: The delivery person must be able to mark a pickup as in
+progress. FR-DEL-05: The delivery person must be able to confirm
+collection of the shoes. FR-DEL-06: The delivery person must be able to
+record a failed pickup and reason. FR-DEL-07: The delivery person must
+confirm handover to the cleaning center. FR-DEL-08: The system must
+record the delivery person and timestamps for key actions. FR-DEL-09:
+Reassignment must be restricted to authorized users and recorded.
+
+6.7 Center receiving and shoe inspection
+
+FR-INSP-01: An operator must be able to see expected incoming shoes.
+FR-INSP-02: An operator must confirm physical receipt. FR-INSP-03: The
+operator must be able to inspect each pair. FR-INSP-04: The inspection
+must support condition notes. FR-INSP-05: The inspection should support
+photos before cleaning. FR-INSP-06: The inspection should record
+existing damage or special conditions. FR-INSP-07: The system should
+record the inspecting employee and inspection time. FR-INSP-08:
+Important inspection findings should be visible to authorized staff and,
+where appropriate, communicated to the customer. FR-INSP-09: The system
+should support recording customer acknowledgement for exceptional
+conditions if the business requires it.
+
+6.8 Cleaning operations
+
+FR-WASH-01: Operators must see cleaning tasks assigned to them or their
+center. FR-WASH-02: Each order item must be traceable to its cleaning
+task. FR-WASH-03: An authorized operator must be able to start cleaning.
+FR-WASH-04: Operators must be able to record progress notes. FR-WASH-05:
+Operators must be able to mark cleaning complete. FR-WASH-06: The system
+should support after-cleaning photos. FR-WASH-07: The system must record
+the responsible operator and timestamps. FR-WASH-08: The system must
+prevent shoes from being marked ready before required cleaning tasks are
+complete. FR-WASH-09: Managers must be able to monitor delayed or
+blocked cleaning tasks.
+
+6.9 Return delivery workflow
+
+FR-RET-01: When an order is ready, authorized staff must be able to
+create or assign a return delivery. FR-RET-02: The delivery person must
+see the return assignment. FR-RET-03: The delivery person must be able
+to mark the return trip in progress. FR-RET-04: The delivery person must
+be able to confirm successful handover to the customer or authorized
+recipient. FR-RET-05: The delivery person must be able to record a
+failed delivery and reason. FR-RET-06: The system must record the
+employee and timestamps. FR-RET-07: An order must not be marked
+delivered until the required delivery confirmation is recorded.
+FR-RET-08: The system should support proof of delivery, such as a
+confirmation code, signature, or photo, subject to privacy and
+operational policy.
+
+6.10 Payments
+
+FR-PAY-01: The system must support cash payments. FR-PAY-02: The system
+must be designed to support online payment methods. FR-PAY-03: Initial
+payment-method options may include Telebirr, CBE Birr, bank transfer,
+card, and other approved methods, subject to provider integration and
+availability. FR-PAY-04: Payment records must be separate from orders.
+FR-PAY-05: A payment must have an amount, method, status, creation time,
+and relevant reference. FR-PAY-06: The system must support failed and
+pending payment attempts. FR-PAY-07: The system should support multiple
+payment attempts and partial payments if the business policy requires
+them. FR-PAY-08: The backend must verify online payment status through
+trusted provider callbacks or server-to-server verification. FR-PAY-09:
+A client application must never be trusted to declare an online payment
+successful. FR-PAY-10: Authorized staff must be able to record cash
+collection. FR-PAY-11: Payment status changes must be auditable.
+FR-PAY-12: Refunds and adjustments must be restricted and recorded.
+
+6.11 Notifications
+
+FR-NOT-01: Customers should receive confirmation after an order is
+placed. FR-NOT-02: Customers should receive important order status
+updates. FR-NOT-03: Delivery personnel should receive new assignment
+notifications. FR-NOT-04: Operators should receive new cleaning task
+notifications. FR-NOT-05: Managers should be able to see operational
+alerts. FR-NOT-06: Notifications should be stored in the system.
+FR-NOT-07: Users should be able to view unread notifications. FR-NOT-08:
+Notification dispatch must use retryable background jobs. FR-NOT-09: The
+application must still show important updates if a push notification is
+not delivered.
+
+6.12 Management dashboard
+
+FR-DASH-01: Managers and administrators must see a role-appropriate
+dashboard. FR-DASH-02: The dashboard should show order counts by status.
+FR-DASH-03: The dashboard should show today’s orders and operational
+workload. FR-DASH-04: The dashboard should show active pickups and
+return deliveries. FR-DASH-05: The dashboard should show cleaning tasks
+in progress and overdue tasks. FR-DASH-06: Authorized users must be able
+to search and filter orders. FR-DASH-07: Managers must be able to assign
+delivery and cleaning work. FR-DASH-08: Administrators must be able to
+manage employees and services. FR-DASH-09: Dashboard data must respect
+branch and role permissions. FR-DASH-10: Reports must be generated from
+authoritative backend data.
+
+6.13 Reports and analytics
+
+FR-REP-01: Authorized managers must be able to view daily, weekly, and
+monthly order summaries. FR-REP-02: The system should report revenue and
+payment totals by period and payment method. FR-REP-03: The system
+should report order counts by status. FR-REP-04: The system should
+report service popularity. FR-REP-05: The system should report employee
+workload and completed tasks. FR-REP-06: The system should report failed
+pickups and deliveries. FR-REP-07: The system should report cancellation
+and rejection counts. FR-REP-08: Administrators should be able to view
+business-wide reports. FR-REP-09: Reports must respect the user’s
+authorization and branch scope. FR-REP-10: Export to CSV or PDF may be
+added where useful.
+
+6.14 Audit logs
+
+FR-AUD-01: The system must record important administrative and
+operational actions. FR-AUD-02: Audit records should identify the actor,
+action, target, timestamp, and relevant metadata. FR-AUD-03: Audit
+records must be protected from ordinary user modification. FR-AUD-04:
+Audit logs should be searchable by authorized administrators. FR-AUD-05:
+Sensitive credentials, passwords, and payment secrets must never be
+written to audit logs.
+
+======================================================================
+7. ORDER LIFECYCLE AND BUSINESS RULES
+======================================================================
+
+7.1 Proposed main order statuses
+
+1.  PLACED Customer submitted the order.
+
+2.  CONFIRMED The order was accepted by the business.
+
+3.  DELIVERY_ASSIGNED A pickup delivery person has been assigned.
+
+4.  PICKUP_IN_PROGRESS The delivery person is handling the pickup.
+
+5.  RECEIVED_AT_CENTER The cleaning center confirmed physical receipt of
+    the shoes.
+
+6.  WASHING_IN_PROGRESS Cleaning work has started.
+
+7.  WASHING_COMPLETED Required cleaning work has been completed.
+
+8.  READY_FOR_DELIVERY Shoes are ready and waiting for return delivery.
+
+9.  OUT_FOR_DELIVERY The return delivery is in progress.
+
+10. DELIVERED Shoes have been handed back successfully.
+
+11. CANCELLED The order was cancelled according to policy or by an
+    authorized exception.
+
+12. REJECTED The business declined the order and recorded a reason.
+
+7.2 Important business rules - The backend, not the mobile or web
+client, controls valid order status transitions. - Every transition must
+record who made it and when. - An order can contain multiple pairs of
+shoes. - Each pair can have its own cleaning service and price. - Each
+order item should have its own inspection and cleaning progress where
+operationally necessary. - An order should not become ready for return
+until all required items are complete. - A return delivery should not be
+completed before the shoes are ready. - A failed pickup or return
+delivery must include a reason. - Reassignment must preserve the
+previous assignment history. - The order total must be calculated on the
+backend. - Historical order prices must not change when a service price
+changes. - Payment records must be independent from order records. - An
+order can have more than one payment attempt. - An order may be
+partially paid if that policy is enabled. - Delivered orders should be
+immutable in normal workflows; corrections must use authorized
+adjustment actions and audit records. - Do not permanently delete
+financial or operational history required for accountability.
+
+7.3 No-show and failed pickup scenario If a delivery person arrives and
+the customer is unavailable: - The delivery person records a failed
+pickup. - A reason and attempt timestamp are stored. - The manager can
+contact the customer and arrange another attempt. - The order remains in
+an appropriate pending/exception state. - Any additional delivery fee
+must follow a clearly defined business policy. - The system must not
+mark the order as received at the center.
+
+7.4 Shoe custody and handover The system should make custody changes
+explicit: - Customer to delivery person. - Delivery person to
+center/operator. - Operator/center to return delivery person. - Return
+delivery person to customer.
+
+Each handover should record the responsible people, timestamp, and
+confirmation. This reduces disputes about missing or damaged shoes.
+
+======================================================================
+8. DATA MODEL AND DATABASE REQUIREMENTS
+======================================================================
+
+8.1 Main database entities
+
+User - id - name/profile fields as appropriate - email and/or phone -
+password hash or external identity reference - role - status -
+timestamps
+
+Customer - id - user id - customer-specific information - timestamps
+
+Employee - id - user id - employee status - employee details -
+timestamps
+
+Branch - id - name - address and contact details - status - timestamps
+
+BranchEmployee - branch id - employee id - branch assignment and role
+scope
+
+Address - id - customer id - address details - optional latitude and
+longitude - default-address indicator
+
+Shoe - id - customer id where a reusable customer shoe profile is
+required - shoe type, brand, color, description, and optional metadata
+
+Service - id - name - description - base price - active status
+
+BranchService - branch id - service id - branch-specific price or
+availability where required
+
+Order - id - unique order/booking code - customer id - branch id -
+pickup address reference or address snapshot - preferred pickup
+schedule - status - subtotal, fees, discounts, tax if applicable,
+total - notes - timestamps
+
+OrderItem - id - order id - shoe description or shoe reference - service
+reference - service name snapshot - unit price snapshot - quantity if
+applicable - item-specific notes - item status where needed
+
+Delivery - id - order id - delivery type (PICKUP or RETURN) - assigned
+employee - status - scheduled time - started/completed timestamps -
+failure reason - handover/proof details
+
+WashingTask - id - order item id - assigned operator - status -
+started/completed timestamps - notes
+
+ShoeInspection - id - order item id - inspecting employee - condition
+notes - before/after inspection type - photo references - timestamp
+
+Payment - id - order id - amount - method - status - provider
+reference - payment transaction reference - timestamps
+
+OrderStatusHistory - id - order id - previous status - new status -
+actor user id - note - timestamp
+
+Notification - id - recipient user id - type - title/body or template
+data - read status - related entity reference - dispatch status -
+timestamp
+
+AuditLog - id - actor user id - action - entity type and entity id -
+metadata - timestamp
+
+8.2 Data design rules - Use UUIDs or Prisma-generated cuid identifiers
+consistently. - Use appropriate unique constraints for email, phone
+where required, order codes, and provider references. - Use foreign keys
+and deliberate deletion rules. - Use Decimal types for money, not
+floating-point types. - Store timestamps consistently, preferably in
+UTC. - Store business timezone configuration for displaying local
+schedules. - Add indexes to frequently filtered fields such as order
+status, customer id, assigned employee id, branch id, and timestamps. -
+Use database transactions for multi-record business operations. - Use
+soft deactivation for users/services where historical records must
+remain. - Store immutable price snapshots in order items. - Avoid
+storing unnecessary personal data. - Keep payment secrets and passwords
+out of ordinary application records.
+
+8.3 Current Prisma schema progress A complete initial Prisma schema has
+been created and formatted in apps/api/prisma/schema.prisma. It includes
+models for: User, Customer, Employee, Branch, BranchEmployee, Address,
+Shoe, Service, BranchService, Order, OrderItem, Delivery, WashingTask,
+ShoeInspection, Payment, OrderStatusHistory, Notification, and AuditLog.
+
+The schema includes enums for user roles/statuses, employee and branch
+statuses, order statuses, delivery types/statuses, washing statuses,
+payment methods, and payment statuses.
+
+The schema was validated and Prisma Client generation succeeded with
+Prisma 7.10.1.
+
+The database migration has not yet been confirmed successful. Do not
+assume that the database schema has been applied until migration status
+and database inspection confirm it.
+
+======================================================================
+9. NON-FUNCTIONAL REQUIREMENTS
+======================================================================
+
+Non-functional requirements describe how well the system must operate.
+
+9.1 Security - All production network traffic must use HTTPS. -
+Passwords must be hashed using Argon2id or a suitably configured modern
+password-hashing algorithm. - Access tokens must be short-lived. -
+Refresh tokens must rotate and support revocation. - Tokens must not be
+stored in insecure plaintext storage on mobile. - Web authentication
+cookies must use secure settings appropriate to the deployment. - All
+endpoints must validate authentication and authorization. - Role and
+branch permissions must be enforced by the backend. - Input must be
+validated and sanitized appropriately. - Rate limiting must protect
+login, password reset, and other sensitive endpoints. - Secrets must be
+stored in environment variables or a managed secrets service. -
+Production secrets must never be committed to Git. - File uploads must
+validate type, size, and authorization. - Private photos must not be
+publicly accessible by default. - Payment verification must happen
+server-side. - Audit logs must capture sensitive administrative actions
+without recording secrets. - Dependencies must be updated and scanned
+regularly. - Administrative accounts should use stronger authentication
+controls; multi-factor authentication is recommended.
+
+9.2 Performance Initial targets to validate through testing: - Common
+API requests should generally complete within 500 ms under normal
+expected load, excluding external providers and large uploads. -
+Dashboard lists must use pagination. - Search and filters must be backed
+by indexed database queries where appropriate. - Large reports should
+use background jobs if they are expensive. - Images should be
+resized/compressed where suitable and uploaded directly to object
+storage through controlled upload flows. - Avoid unnecessary database
+queries and N+1 query patterns. - Use caching only where it does not
+create stale or unsafe business data.
+
+9.3 Availability and reliability - Production service should target at
+least 99.5% monthly availability initially, with a higher target
+considered as the business grows. - Database backups must run on a
+defined schedule. - Backup restoration must be tested periodically. -
+Background jobs must support retries and failed-job inspection. - API
+health checks must report application and dependency health. - Critical
+order updates must be persisted before notification dispatch. - The
+system must handle temporary mobile network loss gracefully. - Duplicate
+requests must not create duplicate orders or payments.
+
+9.4 Scalability - The architecture must support growth in customers,
+orders, employees, and branches. - Branch identifiers and authorization
+scope must be part of relevant business records. - Stateless API
+instances should be possible to scale horizontally. - Redis and BullMQ
+should handle asynchronous workloads. - PostgreSQL indexes and query
+plans must be reviewed as data grows. - Avoid splitting into
+microservices until measurable operational or scaling needs justify it.
+
+9.5 Usability and accessibility - Mobile screens must be responsive to
+common Android and iOS screen sizes. - The web dashboard must work on
+common desktop and tablet widths. - Use clear status labels and
+consistent workflow actions. - Forms must provide understandable
+validation messages. - Important destructive actions must require
+confirmation. - Provide loading, empty, success, and error states. - Use
+accessible color contrast, readable text, and semantic controls. -
+Support localization in the architecture; initial language selection
+remains a product decision.
+
+9.6 Maintainability - Use TypeScript strict mode in the backend and
+dashboard. - Follow consistent naming, formatting, and linting rules. -
+Keep modules focused on a business capability. - Separate controllers
+from business logic. - Use shared validation schemas/contracts where
+practical. - Document environment variables and deployment procedures. -
+Add automated tests for business-critical behavior. - Keep architecture
+and database documentation current.
+
+9.7 Compatibility - Support currently maintained Android and iOS
+versions selected at release time. - Support current major versions of
+Chrome, Edge, Firefox, and Safari for the web dashboard. - Define
+minimum supported device and browser versions before production
+launch. - Test on physical devices as well as emulators.
+
+9.8 Privacy - Collect only information required to provide the
+service. - Restrict customer addresses and phone numbers to authorized
+staff. - Restrict shoe photos to users who need them for service or
+dispute resolution. - Define retention periods for personal data,
+photos, and operational records. - Provide a process for customer data
+access and correction where legally required. - Do not track delivery
+personnel outside active work tasks. - Review applicable Ethiopian
+privacy, consumer, tax, and payment requirements before launch.
+
+9.9 Observability - Use structured logs with correlation/request IDs. -
+Monitor API errors and latency. - Monitor database connectivity and
+resource usage. - Monitor queue depth and failed jobs. - Track key
+business metrics such as orders placed, orders delivered, failed
+pickups, and payment failures. - Avoid logging passwords, tokens, full
+payment credentials, or unnecessary personal data.
+
+======================================================================
+10. API DESIGN REQUIREMENTS
+======================================================================
+
+10.1 API conventions - REST API over HTTPS. - Version API routes, for
+example /api/v1. - Use JSON for ordinary request and response bodies. -
+Use consistent response and error formats. - Validate all request
+bodies, query parameters, and path parameters. - Use pagination for list
+endpoints. - Use filtering and sorting with allowlisted fields. - Use
+idempotency keys for sensitive create operations where appropriate. -
+Document endpoints using OpenAPI/Swagger.
+
+10.2 Suggested endpoint groups
+
+Authentication POST /api/v1/auth/register POST /api/v1/auth/login POST
+/api/v1/auth/refresh POST /api/v1/auth/logout POST
+/api/v1/auth/forgot-password POST /api/v1/auth/reset-password
+
+Current user GET /api/v1/me PATCH /api/v1/me
+
+Customers and addresses GET /api/v1/customers/me GET /api/v1/addresses
+POST /api/v1/addresses PATCH /api/v1/addresses/:id DELETE
+/api/v1/addresses/:id
+
+Services GET /api/v1/services GET /api/v1/services/:id POST
+/api/v1/services PATCH /api/v1/services/:id
+
+Orders POST /api/v1/orders GET /api/v1/orders GET /api/v1/orders/:id
+POST /api/v1/orders/:id/cancel POST /api/v1/orders/:id/confirm POST
+/api/v1/orders/:id/reject GET /api/v1/orders/:id/history
+
+Deliveries GET /api/v1/deliveries/my POST /api/v1/orders/:id/deliveries
+PATCH /api/v1/deliveries/:id/status POST /api/v1/deliveries/:id/reassign
+
+Inspections and cleaning POST /api/v1/order-items/:id/inspections GET
+/api/v1/order-items/:id/inspections POST /api/v1/washing-tasks PATCH
+/api/v1/washing-tasks/:id/status
+
+Payments POST /api/v1/orders/:id/payments GET
+/api/v1/orders/:id/payments POST /api/v1/payments/:id/verify POST
+/api/v1/payments/webhooks/:provider
+
+Notifications GET /api/v1/notifications PATCH
+/api/v1/notifications/:id/read
+
+Employees and administration GET /api/v1/employees POST
+/api/v1/employees PATCH /api/v1/employees/:id GET /api/v1/branches POST
+/api/v1/branches GET /api/v1/reports/summary GET /api/v1/audit-logs
+
+These are proposed endpoint names, not a claim that all endpoints
+already exist.
+
+======================================================================
+11. REAL-TIME AND OFFLINE BEHAVIOR
+======================================================================
+
+11.1 Real-time updates Socket.IO may be introduced for live order and
+delivery updates where polling or push notifications are insufficient.
+
+Potential events: - order.status.updated - delivery.assigned -
+delivery.status.updated - washing_task.assigned -
+washing_task.status.updated - notification.created
+
+Every event must be authorized. A user must only receive events for
+records they are allowed to access.
+
+11.2 Offline support The mobile application should handle intermittent
+connectivity: - Cache selected read-only data. - Show a clear offline
+indicator. - Preserve safe, unsent form data where appropriate. - Queue
+only operations designed for safe retry. - Revalidate permissions and
+business rules on the server when reconnecting. - Do not treat an
+offline status update as final until the server confirms it. - Use
+idempotency keys to reduce duplicate submissions.
+
+The first release should prioritize reliable online workflows before
+implementing complex offline synchronization.
+
+======================================================================
+12. TESTING REQUIREMENTS
+======================================================================
+
+12.1 Backend tests - Unit tests for services and business rules. -
+Integration tests for database operations. - Authentication and
+authorization tests. - Order lifecycle transition tests. - Payment
+verification tests. - Delivery assignment and handover tests. - File
+upload authorization tests. - API validation and error handling tests.
+
+12.2 Mobile tests - Unit tests for state and business logic. - Widget
+tests for important screens and forms. - Integration tests for login,
+order creation, delivery, and operator workflows. - Offline and
+poor-network behavior tests. - Device testing on supported Android and
+iOS versions.
+
+12.3 Web dashboard tests - Component tests for important interactions. -
+End-to-end tests for login, order management, assignments, and
+reports. - Role and branch access tests. - Responsive layout tests.
+
+12.4 Acceptance testing Before a release, run complete scenarios: -
+Customer creates an order with multiple pairs. - Manager confirms and
+assigns pickup. - Delivery person collects shoes and hands them to the
+center. - Operator receives and inspects shoes. - Operator completes all
+cleaning tasks. - Manager or workflow assigns return delivery. -
+Delivery person returns shoes. - Customer sees delivered status. -
+Payment is recorded and reconciled. - Audit history contains the
+expected actions.
+
+======================================================================
+13. DEPLOYMENT AND OPERATIONS
+======================================================================
+
+13.1 Environments Development: - Local Docker PostgreSQL and Redis. -
+Local NestJS API. - Flutter emulator/device. - Local Next.js dashboard.
+
+Staging: - Production-like configuration. - Test data only. - Payment
+provider sandbox where available. - Automated deployment and acceptance
+testing.
+
+Production: - Hosted API and dashboard. - Managed or securely operated
+PostgreSQL. - Redis with persistence/availability settings appropriate
+to workload. - Private object storage. - HTTPS and managed secrets. -
+Monitoring, backups, and alerting.
+
+13.2 Environment configuration Use environment variables for: -
+DATABASE_URL - Redis connection URL or host/port/password - JWT
+access-token configuration - Refresh-token configuration -
+Object-storage credentials and bucket - Firebase credentials - Maps API
+configuration - Payment provider credentials - Web application URL -
+CORS allowlist - Logging and monitoring configuration
+
+Maintain a safe .env.example containing placeholder values only. Real
+.env files must be ignored by Git.
+
+13.3 Database operations - Use Prisma migrations for schema changes. -
+Review migrations before production deployment. - Back up the database
+before high-risk schema changes. - Test migrations against staging. -
+Never delete production data to resolve a migration issue. - Define
+backup retention and restore procedures.
+
+13.4 CI/CD Recommended GitHub Actions workflow: - Install
+dependencies. - Run formatting and lint checks. - Run TypeScript
+checks. - Run unit and integration tests. - Validate Prisma schema. -
+Build the API and dashboard. - Build/test Flutter application as
+appropriate. - Deploy only after required checks pass.
+
+======================================================================
+14. PROJECT PHASES AND IMPLEMENTATION ROADMAP
+======================================================================
+
+Phase 1: Foundation - Confirm requirements and unresolved business
+policies. - Establish repository structure. - Configure Docker
+PostgreSQL and Redis. - Configure NestJS. - Configure Prisma and verify
+database connectivity. - Add environment validation. - Add health-check
+endpoints. - Add logging and API documentation. - Establish coding
+standards and CI checks.
+
+Phase 2: Authentication and access control - User model and account
+lifecycle. - Registration and login. - Password hashing. - Access and
+refresh tokens. - Password reset. - Roles, permissions, and guards. -
+Employee account management. - Automated security tests.
+
+Phase 3: Core business data - Customers and addresses. - Employees and
+branches. - Services and branch service availability. - Shoes and order
+items. - Database constraints and indexes.
+
+Phase 4: Customer ordering - Mobile project setup. - Customer
+registration/login screens. - Profile and address management. - Service
+catalog. - Order creation and summary. - Customer order list and
+detail. - Backend order validation.
+
+Phase 5: Operations and delivery - Manager order queue. - Order
+confirmation/rejection. - Pickup assignment. - Delivery employee
+workflow. - Center receiving. - Shoe inspection and photos. - Operator
+task management. - Cleaning progress. - Return delivery and proof of
+handover.
+
+Phase 6: Payments and notifications - Cash payment recording. - Payment
+status and reconciliation. - Integrate selected online payment
+provider(s). - Payment webhooks and server verification. - Push
+notifications. - Background jobs and retries.
+
+Phase 7: Management dashboard - Next.js setup. - Role-protected
+dashboard. - Orders and assignments. - Employee and service
+management. - Operational summaries. - Reports and audit logs.
+
+Phase 8: Quality and launch - Full acceptance testing. - Security
+review. - Performance testing. - Backup and restore test. - Staging
+deployment. - User training. - Production deployment. - Monitoring and
+support process.
+
+Phase 9: Growth - Multi-branch operations. - Advanced scheduling and
+route optimization. - Customer ratings and loyalty features. -
+Additional notification channels. - Advanced analytics. - Inventory and
+supplies management if required. - More payment integrations based on
+business demand.
+
+======================================================================
+15. MVP: FIRST RELEASE PRIORITIES
+======================================================================
+
+The first usable release should focus on the complete service journey
+rather than implementing every possible feature.
+
+Must-have MVP: - Customer registration and login. - Employee login and
+role permissions. - Service catalog and prices. - Customer address
+management. - Order creation with multiple pairs. - Manager order
+confirmation. - Pickup assignment and delivery status. - Center
+receiving and shoe inspection. - Operator cleaning task and
+completion. - Return delivery and delivery confirmation. - Cash payment
+recording. - Customer order tracking. - Basic push notifications or
+in-app notifications. - Manager dashboard with order and task
+visibility. - Audit history for important actions.
+
+Can follow after MVP: - Multiple branches in production. - Full
+real-time map tracking. - Advanced route optimization. - Loyalty points
+and promotions. - Customer reviews. - Advanced analytics and exports. -
+Multiple online payment providers. - Complex offline synchronization. -
+Inventory and staff scheduling.
+
+======================================================================
+16. RISKS AND MITIGATIONS
+======================================================================
+
+Risk: Shoes are lost or confused between orders. Mitigation: - Unique
+order and item identifiers. - Labels or QR codes if operationally
+useful. - Explicit custody handovers. - Inspection photos and
+timestamps. - Employee accountability and audit history.
+
+Risk: Customer disputes about pre-existing damage. Mitigation: -
+Before-cleaning inspection. - Photos and notes. - Customer
+acknowledgement for exceptional conditions where required.
+
+Risk: Delivery person cannot reach customer. Mitigation: -
+Failed-attempt status and reason. - Rescheduling workflow. - Clear
+customer communication. - Defined extra-attempt policy.
+
+Risk: Incorrect order pricing. Mitigation: - Backend price
+calculation. - Price snapshots on order items. - Decimal money fields. -
+Transactional order creation.
+
+Risk: Fake or inconsistent online payment status. Mitigation: -
+Server-to-server verification. - Signed webhook validation. - Idempotent
+payment processing. - Reconciliation reports.
+
+Risk: Unauthorized access to customer information. Mitigation: - RBAC
+and branch scope. - Backend authorization. - Secure file access. - Audit
+logs. - Rate limits and security testing.
+
+Risk: Database loss. Mitigation: - Automated backups. - Restore tests. -
+Migration review. - Restricted production access.
+
+Risk: Project complexity grows too early. Mitigation: - Modular
+monolith. - MVP prioritization. - Add integrations only when business
+value is clear.
+
+======================================================================
+17. OPEN BUSINESS AND PRODUCT DECISIONS
+======================================================================
+
+The following decisions must be confirmed before the corresponding
+features are finalized:
+
+1.  Exact service catalog and price list.
+2.  Whether pricing is per pair, per service, or based on shoe
+    type/condition.
+3.  Pickup and return delivery fees.
+4.  Whether delivery is included in service prices.
+5.  Pickup time windows and operating hours.
+6.  Customer cancellation deadline and cancellation fees.
+7.  Policy for failed pickup and failed return delivery.
+8.  Payment timing: before cleaning, after cleaning, on delivery, or
+    mixed.
+9.  Whether partial payments are allowed.
+10. Which online payment provider will be integrated first.
+11. Refund and dispute policy.
+12. Required proof of delivery: PIN, signature, photo, or other method.
+13. Whether customers can choose a branch or the system selects one.
+14. Whether operators can reject shoes that cannot safely be cleaned.
+15. Customer support and complaint-handling process.
+16. Initial supported languages.
+17. Data retention periods for photos and personal data.
+18. Whether customer ratings/reviews are part of the first release.
+19. Whether delivery staff need live location sharing during active
+    assignments.
+20. Exact business timezone, currency display, tax, and invoice rules.
+
+These decisions should be recorded in project documentation before
+implementation of the affected modules.
+
+======================================================================
+18. DEFINITION OF DONE
+======================================================================
+
+A feature is complete only when: - Its requirements and permissions are
+understood. - Backend validation and authorization are implemented. -
+Database changes are migrated and reviewed. - Loading, success, empty,
+and error states are handled in the client. - Relevant unit and
+integration tests pass. - Sensitive data is handled securely. - Logs do
+not expose credentials or tokens. - API documentation is updated. - The
+feature has been tested in the relevant role workflow. - Existing
+working features remain functional. - The change is committed with a
+clear Git message.
+
+A release is ready only when: - The main customer-to-delivery workflow
+passes acceptance testing. - Role and branch permissions have been
+tested. - Payment behavior has been verified. - Backup and restore
+procedures are tested. - Production secrets and HTTPS are configured. -
+Monitoring and error reporting are active. - Operational staff
+understand the workflow.
+
+======================================================================
+19. CURRENT PROJECT STATUS
+======================================================================
+
+Completed or established: - Project name: Listro. - Product concept and
+main user roles defined. - Flutter mobile application selected for
+Android and iOS. - Manager and administrator access selected for mobile
+and web dashboard. - NestJS + TypeScript backend created. - PostgreSQL
+selected. - Prisma ORM 7.10.1 installed. - Redis selected and Docker
+containers started. - Root Docker Compose infrastructure created. -
+Prisma schema created, formatted, validated, and client generated. -
+Prisma service and module added to NestJS. - NestJS application starts
+in development mode. - Repository root and API folder established.
+
+In progress: - Correctly configuring the API DATABASE_URL. - Verifying
+direct PostgreSQL authentication from the API. - Resolving Prisma
+migration connectivity. - Applying and verifying the initial database
+migration.
+
+Important current database troubleshooting finding: A direct Node.js
+PostgreSQL connection test reported: “SASL: SCRAM-SERVER-FIRST-MESSAGE:
+client password must be a string”
+
+A safe URL inspection then showed: - username was empty. - database path
+was /listro_db. - password was absent. - root .env contained
+DB_PASSWORD. - API .env DATABASE_URL did not contain a username or
+password.
+
+Therefore, the immediate next development task is to correct
+apps/api/.env DATABASE_URL using the actual Docker PostgreSQL username
+and password, URL-encode special characters in the password, and rerun
+the direct Node.js connection test. Only after that succeeds should
+Prisma migrations be retried.
+
+Do not assume that the initial migration has been applied. Confirm it
+using Prisma migration status and database inspection.
+
+======================================================================
+20. FINAL PROJECT SUMMARY
+======================================================================
+
+Listro is a role-based shoe-cleaning service management platform
+consisting of:
+
+-   A Flutter mobile application for customers and operational
+    employees, with manager and administrator access.
+-   A Next.js web dashboard for managers and administrators.
+-   A NestJS TypeScript backend that owns business rules and
+    authorization.
+-   PostgreSQL with Prisma ORM for persistent data.
+-   Redis and BullMQ for caching and background processing.
+-   Firebase Cloud Messaging for push notifications.
+-   S3-compatible object storage for shoe and inspection photos.
+-   Google Maps or Mapbox for address and delivery assistance.
+-   Docker, GitHub Actions, and monitoring tools for development and
+    operations.
+
+The core workflow is: Customer places order -> Manager confirms order ->
+Delivery person collects shoes -> Center receives and inspects shoes ->
+Operator cleans shoes -> Shoes are marked ready -> Delivery person
+returns shoes -> Customer receives shoes -> Payment and order records
+are reconciled.
+
+The most important engineering principles are: - Keep the backend
+authoritative. - Enforce role and branch permissions on the server. -
+Track every important order and custody transition. - Preserve
+inspection and payment history. - Use secure authentication and
+server-side payment verification. - Build the first release as a modular
+monolith. - Test each milestone before proceeding. - Preserve working
+features and avoid unnecessary destructive changes.
+
+END OF DOCUMENT
