@@ -1,5 +1,5 @@
 import { Body, Controller, Get, HttpCode, Post, Req } from '@nestjs/common';
-import { Throttle } from '@nestjs/throttler';
+import { Throttle } from '../../common/throttler/simple-throttler.guard.js';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser, Public } from '../../common/decorators.js';
 import type { AuthenticatedUser } from '../../common/decorators.js';

@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD, APP_PIPE } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { SimpleThrottlerGuard } from './common/throttler/simple-throttler.guard.js';
 import { createObserveModule } from '@nestjs/observe';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
@@ -48,9 +48,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
           }),
         ]
       : []),
-    ThrottlerModule.forRoot([
-      { name: 'default', ttl: 60_000, limit: 100 },
-    ]),
+
     JwtModule.register({}),
     PrismaModule,
     AuditModule,
@@ -71,7 +69,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
   providers: [
     AppService,
     { provide: APP_PIPE, useClass: StandardSchemaValidationPipe },
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: SimpleThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
   ],
