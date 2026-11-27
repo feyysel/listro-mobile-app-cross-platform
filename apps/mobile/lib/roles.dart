@@ -1,0 +1,47 @@
+class AppRole {
+  static const customer = 'CUSTOMER';
+  static const delivery = 'DELIVERY';
+  static const operator = 'OPERATOR';
+  static const manager = 'MANAGER';
+  static const admin = 'ADMIN';
+
+  static bool isManager(String role) => role == manager || role == admin;
+
+  static bool canCancel(String role) => isManager(role) || role == customer;
+
+  static bool canUseWeb(String role) => isManager(role) || role == operator;
+
+  static String label(String role) {
+    switch (role) {
+      case delivery:
+        return 'Delivery partner';
+      case operator:
+        return 'Cleaning operator';
+      case manager:
+        return 'Branch manager';
+      case admin:
+        return 'Administrator';
+      default:
+        return 'Customer';
+    }
+  }
+}
+
+double workflowProgress(String status) {
+  const steps = [
+    'PLACED',
+    'CONFIRMED',
+    'DELIVERY_ASSIGNED',
+    'PICKUP_IN_PROGRESS',
+    'RECEIVED_AT_CENTER',
+    'WASHING_IN_PROGRESS',
+    'WASHING_COMPLETED',
+    'READY_FOR_DELIVERY',
+    'OUT_FOR_DELIVERY',
+    'DELIVERED',
+  ];
+  if (status == 'CANCELLED' || status == 'REJECTED') return 0;
+  final index = steps.indexOf(status);
+  if (index < 0) return 0;
+  return (index + 1) / steps.length;
+}
