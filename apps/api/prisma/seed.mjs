@@ -117,23 +117,25 @@ async function main() {
   const deliveryEmployee = await ensureEmployee(delivery, 'EMP-DEL-001');
   const adminEmployee = await ensureEmployee(admin, 'EMP-ADM-001');
 
-  const branch = await prisma.branch.upsert({
-    where: { code: 'ADDIS-01' },
-    update: {},
-    create: {
-      name: 'Listro Bole Cleaning Center',
-      code: 'ADDIS-01',
-      address: 'Bole Road, near Medhanialem',
-      city: 'Addis Ababa',
-      subCity: 'Bole',
-      woreda: '03',
-      phone: '+251112345678',
-      email: 'bole@listro.test',
-      status: 'ACTIVE',
-      latitude: 8.9928,
-      longitude: 38.7955,
-    },
+  const branchData = {
+    name: 'Listro Dire Dawa Cleaning Center',
+    code: 'DIRE-01',
+    address: 'Dire Dawa City Center',
+    city: 'Dire Dawa',
+    subCity: 'Central',
+    woreda: '01',
+    phone: '+251112345678',
+    email: 'dire@listro.test',
+    status: 'ACTIVE',
+    latitude: 9.5921,
+    longitude: 41.8683,
+  };
+  const existingBranch = await prisma.branch.findFirst({
+    where: { code: { in: ['ADDIS-01', 'DIRE-01'] } },
   });
+  const branch = existingBranch
+    ? await prisma.branch.update({ where: { id: existingBranch.id }, data: branchData })
+    : await prisma.branch.create({ data: branchData });
 
   for (const employee of [managerEmployee, operatorEmployee, deliveryEmployee, adminEmployee]) {
     await prisma.branchEmployee.upsert({
@@ -163,22 +165,36 @@ async function main() {
   }
 
   let address = await prisma.address.findFirst({ where: { customerId: customer.id, isDefault: true } });
-  if (!address) {
+  if (address) {
+    address = await prisma.address.update({
+      where: { id: address.id },
+      data: {
+        addressLine: 'Dire Dawa City Center',
+        city: 'Dire Dawa',
+        subCity: 'Central',
+        woreda: '01',
+        houseNumber: 'D-24',
+        landmark: 'Dire Dawa Stadium',
+        latitude: 9.5908,
+        longitude: 41.8703,
+      },
+    });
+  } else {
     address = await prisma.address.create({
       data: {
         customerId: customer.id,
         label: 'Home',
         recipientName: 'Selam Tesfaye',
         phone: '+251911000005',
-        addressLine: 'Bole Michael, behind Friendship Square',
-        city: 'Addis Ababa',
-        subCity: 'Bole',
-        woreda: '03',
-        houseNumber: 'B-24',
-        landmark: 'Friendship Square',
+        addressLine: 'Dire Dawa City Center',
+        city: 'Dire Dawa',
+        subCity: 'Central',
+        woreda: '01',
+        houseNumber: 'D-24',
+        landmark: 'Dire Dawa Stadium',
         isDefault: true,
-        latitude: 8.9916,
-        longitude: 38.7874,
+        latitude: 9.5908,
+        longitude: 41.8703,
       },
     });
   }
