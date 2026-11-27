@@ -4,9 +4,15 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import express from 'express';
 import { AppModule, ObserveInstrument } from './app.module.js';
 
+const observeEnabled =
+  !!process.env.OBSERVE_APP_KEY &&
+  !!process.env.OBSERVE_APP_SECRET &&
+  process.env.OBSERVE_APP_KEY !== 'YOUR_APP_KEY' &&
+  process.env.OBSERVE_APP_SECRET !== 'YOUR_APP_SECRET';
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
-    instrument: ObserveInstrument,
+    ...(observeEnabled ? { instrument: ObserveInstrument } : {}),
     bodyParser: false,
   });
 

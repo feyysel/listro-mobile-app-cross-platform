@@ -25,6 +25,12 @@ import { ReportsModule } from './modules/reports/reports.module.js';
 import { UploadsModule } from './modules/uploads/uploads.module.js';
 import { HealthModule } from './modules/health/health.module.js';
 
+const observeEnabled =
+  !!process.env.OBSERVE_APP_KEY &&
+  !!process.env.OBSERVE_APP_SECRET &&
+  process.env.OBSERVE_APP_KEY !== 'YOUR_APP_KEY' &&
+  process.env.OBSERVE_APP_SECRET !== 'YOUR_APP_SECRET';
+
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
 @Module({
@@ -33,11 +39,15 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
       isGlobal: true,
       validationSchema: envSchema,
     }),
-    ObserveModule.forRoot({
-      appKey: process.env.OBSERVE_APP_KEY ?? 'YOUR_APP_KEY',
-      appSecret: process.env.OBSERVE_APP_SECRET ?? 'YOUR_APP_SECRET',
-      serviceId: 'api',
-    }),
+    ...(observeEnabled
+      ? [
+          ObserveModule.forRoot({
+            appKey: process.env.OBSERVE_APP_KEY!,
+            appSecret: process.env.OBSERVE_APP_SECRET!,
+            serviceId: 'api',
+          }),
+        ]
+      : []),
     ThrottlerModule.forRoot([
       { name: 'default', ttl: 60_000, limit: 100 },
     ]),
