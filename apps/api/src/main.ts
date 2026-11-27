@@ -40,6 +40,14 @@ async function bootstrap() {
     'api/docs',
     app,
     SwaggerModule.createDocument(app, swaggerConfig),
+    {
+      customCssUrl:
+        'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.34.1/swagger-ui.min.css',
+      customJs: [
+        'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.34.1/swagger-ui-bundle.js',
+        'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.34.1/swagger-ui-standalone-preset.js',
+      ],
+    },
   );
 
   await app.listen(
