@@ -6,6 +6,7 @@ import {
   Boxes,
   CircleUserRound,
   CreditCard,
+  History,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -53,6 +54,7 @@ interface NotificationItem {
 const mainNav: NavItem[] = [
   { label: 'Overview', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Orders', href: '/orders', icon: Boxes },
+  { label: 'History', href: '/history', icon: History },
   { label: 'Cleaning', href: '/washing', icon: Sparkles, roles: ['OPERATOR', 'MANAGER', 'ADMIN'] },
   { label: 'Deliveries', href: '/deliveries', icon: Truck, roles: ['DELIVERY', 'MANAGER', 'ADMIN'] },
   { label: 'Payments', href: '/payments', icon: CreditCard, roles: ['MANAGER', 'ADMIN'] },

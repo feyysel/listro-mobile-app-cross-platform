@@ -283,12 +283,19 @@ class ApiClient {
         .toList();
   }
 
-  Future<List<OrderModel>> orders({String? search, String? status}) async {
+  Future<List<OrderModel>> orders({
+    String? search,
+    String? status,
+    bool? liveOnly,
+    bool? includePayments,
+  }) async {
     final query = <String, String>{'limit': '100'};
     if (search != null && search.trim().isNotEmpty) {
       query['search'] = Uri.encodeComponent(search.trim());
     }
     if (status != null && status.isNotEmpty) query['status'] = status;
+    if (liveOnly == true) query['liveOnly'] = 'true';
+    if (includePayments == true) query['includePayments'] = 'true';
     final queryString = query.entries.map((entry) => '${entry.key}=${entry.value}').join('&');
     final result = await get('/orders?$queryString') as Map<String, dynamic>;
     final items = result['items'] as List<dynamic>? ?? [];

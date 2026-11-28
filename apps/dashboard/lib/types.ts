@@ -18,6 +18,7 @@ export interface OrderSummary {
   totalAmount: string | number;
   currency: string;
   placedAt: string;
+  completedAt?: string | null;
   customer: {
     user: {
       firstName: string;
@@ -28,6 +29,16 @@ export interface OrderSummary {
   };
   branch: { name: string; code: string } | null;
   _count: { items: number };
+  payments?: Array<{
+    id: string;
+    kind?: string;
+    amount: string | number;
+    method: string;
+    status: string;
+    transactionReference?: string | null;
+    paidAt?: string | null;
+    createdAt: string;
+  }>;
 }
 
 export interface OrderDetail extends OrderSummary {

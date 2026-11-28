@@ -33,12 +33,18 @@ const createOrderSchema = z.object({
   items: z.array(orderItemSchema).min(1).max(20),
 });
 
+const booleanQuery = z
+  .union([z.boolean(), z.enum(['true', 'false'])])
+  .transform((value) => value === true || value === 'true');
+
 const listSchema = z.object({
   status: z.nativeEnum(OrderStatus).optional(),
   search: z.string().trim().optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
   mine: z.coerce.boolean().default(false),
+  liveOnly: booleanQuery.optional().default(false),
+  includePayments: booleanQuery.optional().default(false),
 });
 
 const decisionSchema = z.object({

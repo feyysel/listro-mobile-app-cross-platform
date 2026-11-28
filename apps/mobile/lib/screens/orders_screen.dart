@@ -23,11 +23,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
   Timer? _pollTimer;
   StreamSubscription<RealtimeEvent>? _realtimeSub;
   List<OrderModel> _orders = [];
-  String _filter = 'All';
   String? _error;
   bool _searching = false;
-
-  static const _filters = ['All', 'Active', 'Completed'];
 
   @override
   void initState() {
@@ -62,7 +59,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   Future<void> _load() async {
     try {
-      final orders = await ApiClient.instance.orders(search: _searchController.text);
+      final orders = await ApiClient.instance.orders(
+        search: _searchController.text,
+        liveOnly: true,
+      );
       if (!mounted) return;
       setState(() {
         _orders = orders;
@@ -74,22 +74,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
     }
   }
 
-  List<OrderModel> get _visibleOrders {
-    if (_filter == 'Active') {
-      return _orders
-          .where((order) => !['DELIVERED', 'CANCELLED', 'REJECTED'].contains(order.status))
-          .toList();
-    }
-    if (_filter == 'Completed') {
-      return _orders.where((order) => order.status == 'DELIVERED').toList();
-    }
-    return _orders;
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Your orders')),
+      appBar: AppBar(title: const Text('Live orders')),
       body: Column(
         children: [
           Padding(
@@ -125,27 +113,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 builder: (context, snapshot) {
                   final loading = snapshot.connectionState == ConnectionState.waiting &&
                       _orders.isEmpty;
-                  final orders = _visibleOrders;
+                  final orders = _orders;
                   return ListView(
                     padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
                     children: [
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            for (final filter in _filters)
-                              Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: FilterChip(
-                                  label: Text(filter),
-                                  selected: _filter == filter,
-                                  onSelected: (_) => setState(() => _filter = filter),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
                       if (_error != null)
                         InlineError(
                           message: _error!,
@@ -171,7 +142,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                 const SizedBox(height: 6),
                                 Text(
                                   _searchController.text.isEmpty
-                                      ? 'Book a clean and it will appear here with live status updates.'
+                                      ? 'Only live orders appear here. Completed orders are in History.'
                                       : 'No orders match “${_searchController.text}”.',
                                   textAlign: TextAlign.center,
                                   style: const TextStyle(color: AppColors.muted, fontSize: 12),

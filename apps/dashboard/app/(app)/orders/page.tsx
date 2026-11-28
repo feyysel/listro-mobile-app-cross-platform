@@ -19,8 +19,6 @@ const statusTabs = [
   ['WASHING_COMPLETED', 'Wash done'],
   ['READY_FOR_DELIVERY', 'Ready'],
   ['OUT_FOR_DELIVERY', 'Out'],
-  ['DELIVERED', 'Delivered'],
-  ['CANCELLED', 'Cancelled'],
 ];
 
 export default function OrdersPage() {
@@ -47,7 +45,7 @@ export default function OrdersPage() {
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    const params = new URLSearchParams({ page: String(page), limit: '20' });
+    const params = new URLSearchParams({ page: String(page), limit: '20', liveOnly: 'true' });
     if (status !== 'ALL') params.set('status', status);
     if (search) params.set('search', search);
     try {
@@ -71,7 +69,7 @@ export default function OrdersPage() {
         <div>
           <div className="eyebrow">Order control center</div>
           <h1 className="title">Orders</h1>
-          <p className="subtitle">Follow every pair from booking to doorstep.</p>
+          <p className="subtitle">Live orders only. Completed orders are in History.</p>
         </div>
         <div className="header-actions">
           <span className="badge blue">{data?.meta.total ?? 0} total orders</span>

@@ -1,6 +1,16 @@
 import { BadRequestException } from '@nestjs/common';
 import { OrderStatus } from '../generated/prisma/client.js';
 
+export const TERMINAL_ORDER_STATUSES: OrderStatus[] = [
+  OrderStatus.DELIVERED,
+  OrderStatus.CANCELLED,
+  OrderStatus.REJECTED,
+];
+
+export const LIVE_ORDER_STATUSES: OrderStatus[] = Object.values(OrderStatus).filter(
+  (status) => !TERMINAL_ORDER_STATUSES.includes(status),
+);
+
 export const ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   [OrderStatus.PLACED]: [
     OrderStatus.CONFIRMED,

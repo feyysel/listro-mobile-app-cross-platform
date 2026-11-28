@@ -12,7 +12,10 @@ import {
   PaymentStatus,
   UserRole,
 } from '../../generated/prisma/client.js';
-import { assertOrderTransition } from '../../common/order-transitions.js';
+import {
+  assertOrderTransition,
+  LIVE_ORDER_STATUSES,
+} from '../../common/order-transitions.js';
 import type { AuthenticatedUser } from '../../common/decorators.js';
 import { AuditService } from '../audit/audit.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
@@ -262,16 +265,23 @@ export class OrdersService {
       page: number;
       limit: number;
       mineOnly?: boolean;
+      liveOnly?: boolean;
+      includePayments?: boolean;
     },
   ) {
     const isStaff =
       user.role !== UserRole.CUSTOMER && !options.mineOnly;
+    const statusFilter = options.status
+      ? { status: options.status }
+      : options.liveOnly
+        ? { status: { in: LIVE_ORDER_STATUSES } }
+        : {};
     const where = {
       ...(!isStaff ? { customerId: user.customerId ?? '' } : {}),
       ...(isStaff && user.branchIds?.length
         ? { branchId: { in: user.branchIds } }
         : {}),
-      ...(options.status ? { status: options.status } : {}),
+      ...statusFilter,
       ...(options.search
         ? {
             OR: [
@@ -297,6 +307,24 @@ export class OrdersService {
           },
           branch: { select: { id: true, name: true, code: true } },
           _count: { select: { items: true } },
+          ...(options.includePayments
+            ? {
+                payments: {
+                  orderBy: { createdAt: 'desc' as const },
+                  select: {
+                    id: true,
+                    orderId: true,
+                    kind: true,
+                    amount: true,
+                    method: true,
+                    status: true,
+                    transactionReference: true,
+                    paidAt: true,
+                    createdAt: true,
+                  },
+                },
+              }
+            : {}),
         },
         orderBy: { createdAt: 'desc' },
         skip: (options.page - 1) * options.limit,

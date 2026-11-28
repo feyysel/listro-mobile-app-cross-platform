@@ -6,6 +6,7 @@ import '../api.dart';
 import '../realtime.dart';
 import '../roles.dart';
 import 'delivery_home_screen.dart';
+import 'history_screen.dart';
 import 'home_screen.dart';
 import 'manager_home_screen.dart';
 import 'login_screen.dart';
@@ -85,6 +86,7 @@ class _MainShellState extends State<MainShell> {
     final pages = <Widget>[
       _homeFor(role),
       const OrdersScreen(),
+      const HistoryScreen(),
       const NotificationsScreen(),
       const ProfileScreen(),
     ];
@@ -97,6 +99,7 @@ class _MainShellState extends State<MainShell> {
           const BottomNavigationBarItem(icon: Icon(Icons.home_rounded), label: 'Home'),
           const BottomNavigationBarItem(
               icon: Icon(Icons.receipt_long_rounded), label: 'Orders'),
+          const BottomNavigationBarItem(icon: Icon(Icons.history_rounded), label: 'History'),
           BottomNavigationBarItem(
             icon: Badge(
               label: Text('$_unread'),

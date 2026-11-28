@@ -117,11 +117,13 @@ class OrderModel {
   final double totalAmount;
   final String currency;
   final DateTime placedAt;
+  final DateTime? completedAt;
   final String customerName;
   final String branchName;
   final int itemCount;
   final List<OrderItemModel> items;
   final List<StatusEvent> statusHistory;
+  final List<PaymentModel> payments;
 
   OrderModel({
     required this.id,
@@ -130,11 +132,13 @@ class OrderModel {
     required this.totalAmount,
     required this.currency,
     required this.placedAt,
+    this.completedAt,
     required this.customerName,
     required this.branchName,
     required this.itemCount,
     this.items = const [],
     this.statusHistory = const [],
+    this.payments = const [],
   });
 
   factory OrderModel.fromJson(Map<String, dynamic> json, {bool detailed = false}) {
@@ -144,6 +148,7 @@ class OrderModel {
     final count = json['_count'] as Map<String, dynamic>? ?? {};
     final rawItems = json['items'] as List<dynamic>? ?? [];
     final rawHistory = json['statusHistory'] as List<dynamic>? ?? [];
+    final rawPayments = json['payments'] as List<dynamic>? ?? [];
 
     return OrderModel(
       id: json['id'] as String? ?? '',
@@ -152,6 +157,7 @@ class OrderModel {
       totalAmount: double.tryParse(json['totalAmount']?.toString() ?? '0') ?? 0,
       currency: json['currency'] as String? ?? 'ETB',
       placedAt: DateTime.tryParse(json['placedAt']?.toString() ?? '') ?? DateTime.now(),
+      completedAt: DateTime.tryParse(json['completedAt']?.toString() ?? ''),
       customerName:
           '${customerUser['firstName'] ?? ''} ${customerUser['lastName'] ?? ''}'.trim(),
       branchName: branch['name'] as String? ?? 'Branch assignment pending',
@@ -164,6 +170,9 @@ class OrderModel {
       statusHistory: detailed
           ? rawHistory.map((event) => StatusEvent.fromJson(event as Map<String, dynamic>)).toList()
           : const [],
+      payments: rawPayments
+          .map((payment) => PaymentModel.fromJson(payment as Map<String, dynamic>))
+          .toList(),
     );
   }
 }
