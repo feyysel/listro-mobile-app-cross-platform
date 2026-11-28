@@ -143,9 +143,9 @@ export default function WashingPage() {
                     <div className="cell-strong">{task.orderItem.serviceName}</div>
                     <div className="cell-muted">{task.orderItem.shoeBrand ?? 'Unbranded'} · {task.orderItem.shoeCategory}</div>
                   </td>
-                  <td>{task.order.customer.user.firstName} {task.order.customer.user.lastName ?? ''}</td>
+                  <td>{task.order.customer?.user ? `${task.order.customer.user.firstName} ${task.order.customer.user.lastName ?? ''}`.trim() : '—'}</td>
                   <td className="cell-muted">
-                    {task.operator ? `${task.operator.user.firstName} ${task.operator.user.lastName ?? ''}` : 'Unassigned'}
+                    {task.operator?.user ? `${task.operator.user.firstName} ${task.operator.user.lastName ?? ''}`.trim() : 'Unassigned'}
                   </td>
                   <td><StatusBadge status={task.status} /></td>
                   <td className="cell-right cell-muted">{dateTime(task.createdAt)}</td>

@@ -496,8 +496,16 @@ export class OperationsService {
     return this.prisma.washingTask.findMany({
       where: { operatorId: user.employeeId, ...(status ? { status } : {}) },
       include: {
-        order: { select: { id: true, bookingCode: true, status: true } },
+        order: {
+          select: {
+            id: true,
+            bookingCode: true,
+            status: true,
+            customer: { include: { user: { select: { firstName: true, lastName: true } } } },
+          },
+        },
         orderItem: true,
+        operator: { include: { user: { select: { firstName: true, lastName: true } } } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -508,7 +516,14 @@ export class OperationsService {
     return this.prisma.washingTask.findMany({
       where: { branchId: { in: user.branchIds }, ...(status ? { status } : {}) },
       include: {
-        order: { select: { id: true, bookingCode: true, status: true } },
+        order: {
+          select: {
+            id: true,
+            bookingCode: true,
+            status: true,
+            customer: { include: { user: { select: { firstName: true, lastName: true } } } },
+          },
+        },
         orderItem: true,
         operator: { include: { user: { select: { firstName: true, lastName: true } } } },
       },
