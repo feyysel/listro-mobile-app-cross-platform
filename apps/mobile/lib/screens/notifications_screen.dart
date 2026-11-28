@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../models.dart';
+import '../realtime.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'order_detail_screen.dart';
@@ -17,11 +20,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   late Future<void> _loading;
   List<AppNotification> _items = [];
   String? _error;
+  StreamSubscription<RealtimeEvent>? _realtimeSub;
 
   @override
   void initState() {
     super.initState();
     _loading = _load();
+    _realtimeSub = RealtimeClient.instance.events.listen((event) {
+      if (event.type == 'notification') _load();
+    });
+  }
+
+  @override
+  void dispose() {
+    _realtimeSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {

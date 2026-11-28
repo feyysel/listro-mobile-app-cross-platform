@@ -24,6 +24,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { ReportsModule } from './modules/reports/reports.module.js';
 import { UploadsModule } from './modules/uploads/uploads.module.js';
 import { HealthModule } from './modules/health/health.module.js';
+import { RealtimeModule } from './modules/realtime/realtime.module.js';
 
 const observeEnabled =
   !!process.env.OBSERVE_APP_KEY &&
@@ -64,6 +65,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     ReportsModule,
     UploadsModule,
     HealthModule,
+    RealtimeModule,
   ],
   controllers: [AppController],
   providers: [

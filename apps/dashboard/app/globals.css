@@ -1191,9 +1191,33 @@ tbody tr:last-child td {
   z-index: 40;
 }
 
+.notification-panel .card-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
 .notification-item {
+  width: 100%;
   padding: 12px 0;
+  border: 0;
   border-bottom: 1px solid #f0f2f6;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.notification-item.unread strong::after {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: var(--brand);
+  vertical-align: middle;
 }
 
 .notification-item:last-child {

@@ -8,10 +8,12 @@ import {
   DeliveryStatus,
   DeliveryType,
   OrderStatus,
+  PaymentStatus,
   UserRole,
   WashingStatus,
 } from '../../generated/prisma/client.js';
 import type { AuthenticatedUser } from '../../common/decorators.js';
+import { assertDeliveryTransition } from '../../common/delivery-transitions.js';
 import { AuditService } from '../audit/audit.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { OrdersService } from '../orders/orders.service.js';
@@ -68,6 +70,23 @@ export class OperationsService {
     });
     if (customer) {
       await this.notificationsService.notify({ userId: customer.customer.userId, ...payload });
+    }
+  }
+
+  private async assertFullyPaid(orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { totalAmount: true, bookingCode: true },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+    const paid = await this.prisma.payment.aggregate({
+      where: { orderId, status: PaymentStatus.COMPLETED },
+      _sum: { amount: true },
+    });
+    if (Number(paid._sum.amount ?? 0) + 0.001 < Number(order.totalAmount)) {
+      throw new BadRequestException(
+        `The remaining balance for order ${order.bookingCode} must be paid before return delivery is completed`,
+      );
     }
   }
 
@@ -234,7 +253,7 @@ export class OperationsService {
         data: { deliveryId: delivery.id, orderId },
       });
     } else {
-      await this.notifyRoles([UserRole.MANAGER, UserRole.ADMIN], {
+      await this.notifyRoles([UserRole.MANAGER, UserRole.ADMIN, UserRole.DELIVERY], {
         type: 'delivery.unassigned',
         title: 'Return delivery needs assignment',
         message: `Order ${order.bookingCode} is ready and has no return delivery partner.`,
@@ -280,6 +299,48 @@ export class OperationsService {
     }
     if (delivery.status === DeliveryStatus.COMPLETED) {
       throw new BadRequestException('Delivery is already completed');
+    }
+    assertDeliveryTransition(delivery.status, status);
+
+    const orderStatus = delivery.order.status;
+    if (
+      status === DeliveryStatus.IN_PROGRESS &&
+      delivery.type === DeliveryType.PICKUP &&
+      !([OrderStatus.DELIVERY_ASSIGNED, OrderStatus.PICKUP_IN_PROGRESS] as OrderStatus[]).includes(
+        orderStatus,
+      )
+    ) {
+      throw new BadRequestException('Order is not ready for pickup');
+    }
+    if (
+      status === DeliveryStatus.COMPLETED &&
+      delivery.type === DeliveryType.PICKUP &&
+      !([OrderStatus.PICKUP_IN_PROGRESS, OrderStatus.RECEIVED_AT_CENTER] as OrderStatus[]).includes(
+        orderStatus,
+      )
+    ) {
+      throw new BadRequestException('Pickup has not been started');
+    }
+    if (
+      status === DeliveryStatus.IN_PROGRESS &&
+      delivery.type === DeliveryType.RETURN &&
+      !([OrderStatus.READY_FOR_DELIVERY, OrderStatus.OUT_FOR_DELIVERY] as OrderStatus[]).includes(
+        orderStatus,
+      )
+    ) {
+      throw new BadRequestException('Order is not ready for return delivery');
+    }
+    if (
+      status === DeliveryStatus.COMPLETED &&
+      delivery.type === DeliveryType.RETURN &&
+      !([OrderStatus.OUT_FOR_DELIVERY, OrderStatus.DELIVERED] as OrderStatus[]).includes(
+        orderStatus,
+      )
+    ) {
+      throw new BadRequestException('Return delivery has not been started');
+    }
+    if (status === DeliveryStatus.COMPLETED && delivery.type === DeliveryType.RETURN) {
+      await this.assertFullyPaid(delivery.orderId);
     }
 
     const updated = await this.prisma.delivery.update({
@@ -371,6 +432,12 @@ export class OperationsService {
         title: 'Order delivered',
         message: `Order ${delivery.order.bookingCode} was delivered to the customer.`,
         data: statusData,
+      });
+      await this.notifyCustomer(delivery.orderId, {
+        type: 'order.delivered',
+        title: 'Your cleaned order arrived',
+        message: `Order ${delivery.order.bookingCode} was delivered. Please rate your service in the app.`,
+        data: { ...statusData, canRate: true },
       });
     }
 
@@ -573,11 +640,17 @@ export class OperationsService {
       where: { orderId_type: { orderId, type: DeliveryType.PICKUP } },
     });
     await this.createReturn(orderId, pickup?.employeeId ?? undefined, actor);
-    await this.notifyRoles([UserRole.MANAGER, UserRole.ADMIN], {
+    await this.notifyRoles([UserRole.MANAGER, UserRole.ADMIN, UserRole.DELIVERY], {
       type: 'washing.ready',
       title: 'Cleaning complete',
       message: `Order ${order.bookingCode} is cleaned and ready for return delivery.`,
       data: { orderId },
+    });
+    await this.notifyCustomer(orderId, {
+      type: 'order.ready',
+      title: 'Ready to return',
+      message: `Order ${order.bookingCode} is cleaned. Pay the remaining balance to receive it.`,
+      data: { orderId, requiresFinalPayment: true },
     });
     return this.prisma.order.findUnique({ where: { id: orderId } });
   }

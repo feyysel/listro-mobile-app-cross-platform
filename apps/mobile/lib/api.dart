@@ -112,6 +112,8 @@ class ApiClient {
     sessionRevision.value++;
   }
 
+  Future<bool> refreshSession() => _refreshAccessToken();
+
   Future<bool> _refreshAccessToken() async {
     final pending = _refreshing;
     if (pending != null) return pending;

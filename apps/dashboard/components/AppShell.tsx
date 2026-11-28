@@ -20,15 +20,17 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   api,
   getStoredUser,
   getToken,
   logout,
+  patch,
   restoreSession,
   SESSION_EVENT,
 } from '@/lib/api';
+import { useRealtime } from '@/lib/realtime';
 import { readThemePreference, themeIsDark, toggleTheme } from '@/lib/theme';
 import type { Role, SessionUser } from '@/lib/types';
 
@@ -37,6 +39,15 @@ interface NavItem {
   href: string;
   icon: React.ComponentType<{ size?: number }>;
   roles?: Role[];
+}
+
+interface NotificationItem {
+  id: string;
+  title: string;
+  message: string;
+  createdAt: string;
+  isRead: boolean;
+  data?: { orderId?: string } | null;
 }
 
 const mainNav: NavItem[] = [
@@ -65,7 +76,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [notifications, setNotifications] = useState<Array<{ id: string; title: string; message: string; createdAt: string }>>([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [dark, setDark] = useState(false);
 
   useEffect(() => {
@@ -96,14 +108,56 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     };
   }, [router]);
 
-  useEffect(() => {
+  const loadNotifications = useCallback(async () => {
     if (!getToken()) return;
-    api<{ items: Array<{ id: string; title: string; message: string; createdAt: string }> }>(
-      '/notifications?limit=5',
-    )
-      .then((result) => setNotifications(result.items))
-      .catch(() => setNotifications([]));
+    try {
+      const result = await api<{ items: NotificationItem[]; unreadCount: number }>(
+        '/notifications?limit=5',
+      );
+      setNotifications(result.items);
+      setUnreadCount(result.unreadCount);
+    } catch {
+      setNotifications([]);
+      setUnreadCount(0);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadNotifications();
+  }, [loadNotifications]);
+
+  useRealtime((message) => {
+    if (message.type === 'notification') void loadNotifications();
+  });
+
+  async function openNotification(item: NotificationItem) {
+    setNotificationsOpen(false);
+    if (!item.isRead) {
+      setNotifications((current) =>
+        current.map((notification) =>
+          notification.id === item.id ? { ...notification, isRead: true } : notification,
+        ),
+      );
+      setUnreadCount((current) => Math.max(0, current - 1));
+      try {
+        await patch(`/notifications/${item.id}/read`, {});
+      } catch {
+        void loadNotifications();
+      }
+    }
+    const orderId = typeof item.data?.orderId === 'string' ? item.data.orderId : null;
+    router.push(orderId ? `/orders?order=${encodeURIComponent(orderId)}` : '/orders');
+  }
+
+  async function markAllRead() {
+    setNotifications((current) => current.map((item) => ({ ...item, isRead: true })));
+    setUnreadCount(0);
+    try {
+      await patch('/notifications/read-all', {});
+    } catch {
+      void loadNotifications();
+    }
+  }
 
   const initials = `${user?.firstName?.[0] ?? ''}${user?.lastName?.[0] ?? ''}`.toUpperCase() || 'L';
 
@@ -198,19 +252,30 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 aria-label="Notifications"
               >
                 <Bell size={18} />
-                {notifications.some((item) => item.title) ? <span className="dot" /> : null}
+                {unreadCount > 0 ? <span className="dot" /> : null}
               </button>
               {notificationsOpen ? (
                 <div className="notification-panel">
-                  <div className="card-title">Notifications</div>
+                  <div className="card-title">
+                    Notifications
+                    {unreadCount > 0 ? (
+                      <button className="link-button" onClick={() => void markAllRead()}>
+                        Mark all read
+                      </button>
+                    ) : null}
+                  </div>
                   {notifications.length === 0 ? (
                     <p className="cell-muted">You are all caught up.</p>
                   ) : (
                     notifications.map((item) => (
-                      <div key={item.id} className="notification-item">
+                      <button
+                        key={item.id}
+                        className={`notification-item${item.isRead ? '' : ' unread'}`}
+                        onClick={() => void openNotification(item)}
+                      >
                         <strong>{item.title}</strong>
                         <span>{item.message}</span>
-                      </div>
+                      </button>
                     ))
                   )}
                 </div>

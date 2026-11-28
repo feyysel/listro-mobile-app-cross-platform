@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { OrderDrawer } from '@/components/OrderDrawer';
 import { Card, dateTime, Empty, Loader, money, StatusBadge, Toast } from '@/components/ui';
 import { api } from '@/lib/api';
+import { useLiveRefresh } from '@/lib/realtime';
 import type { OrderSummary, Page as PageType } from '@/lib/types';
 
 const statusTabs = [
@@ -15,6 +16,7 @@ const statusTabs = [
   ['PICKUP_IN_PROGRESS', 'Pickup'],
   ['RECEIVED_AT_CENTER', 'Received'],
   ['WASHING_IN_PROGRESS', 'Washing'],
+  ['WASHING_COMPLETED', 'Wash done'],
   ['READY_FOR_DELIVERY', 'Ready'],
   ['OUT_FOR_DELIVERY', 'Out'],
   ['DELIVERED', 'Delivered'],
@@ -31,8 +33,11 @@ export default function OrdersPage() {
   const [toast, setToast] = useState<{ message: string; error?: boolean } | null>(null);
 
   useEffect(() => {
-    const searchParam = new URLSearchParams(window.location.search).get('search');
+    const params = new URLSearchParams(window.location.search);
+    const searchParam = params.get('search');
     if (searchParam) setSearch(searchParam);
+    const orderParam = params.get('order');
+    if (orderParam) setDrawerId(orderParam);
   }, []);
 
   const notify = useCallback((message: string, error?: boolean) => {
@@ -57,6 +62,8 @@ export default function OrdersPage() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useLiveRefresh(refresh);
 
   return (
     <>

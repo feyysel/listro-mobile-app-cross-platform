@@ -4,6 +4,7 @@ import { CheckCircle2, MapPin, Play, Truck } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Card, Empty, Loader, StatusBadge, Toast, dateTime } from '@/components/ui';
 import { api, patch } from '@/lib/api';
+import { useLiveRefresh } from '@/lib/realtime';
 import type { Delivery } from '@/lib/types';
 
 const tabs = ['ALL', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'FAILED'];
@@ -33,6 +34,8 @@ export default function DeliveriesPage() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useLiveRefresh(refresh);
 
   async function update(id: string, nextStatus: string, message: string) {
     try {

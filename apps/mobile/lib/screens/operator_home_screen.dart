@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../models.dart';
+import '../realtime.dart';
 import '../roles.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -23,17 +24,22 @@ class _OperatorHomeScreenState extends State<OperatorHomeScreen> {
   bool _busy = false;
   bool _initialLoading = true;
   Timer? _pollTimer;
+  StreamSubscription<RealtimeEvent>? _realtimeSub;
 
   @override
   void initState() {
     super.initState();
     _loading = _load();
-    _pollTimer = Timer.periodic(const Duration(seconds: 30), (_) => _load());
+    _pollTimer = Timer.periodic(const Duration(seconds: 15), (_) => _load());
+    _realtimeSub = RealtimeClient.instance.events.listen((event) {
+      if (event.type == 'notification') _load();
+    });
   }
 
   @override
   void dispose() {
     _pollTimer?.cancel();
+    _realtimeSub?.cancel();
     super.dispose();
   }
 

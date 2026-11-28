@@ -129,8 +129,15 @@ export class PaymentsService {
     const depositRequired = Math.ceil(balance.total * 50) / 100;
     const status = balance.order.status as OrderStatus;
 
-    if (!isStaff && kind === PaymentKind.FINAL && status !== OrderStatus.DELIVERED) {
-      throw new BadRequestException('Final payment is available after delivery');
+    const finalWindow: OrderStatus[] = [
+      OrderStatus.READY_FOR_DELIVERY,
+      OrderStatus.OUT_FOR_DELIVERY,
+      OrderStatus.DELIVERED,
+    ];
+    if (!isStaff && kind === PaymentKind.FINAL && !finalWindow.includes(status)) {
+      throw new BadRequestException(
+        'Final payment is available once the order is ready for return delivery',
+      );
     }
     if (
       !isStaff &&
@@ -242,6 +249,20 @@ export class PaymentsService {
           data: { orderId, paymentId: payment.id, kind },
         },
       );
+    } else {
+      const customer = await this.prisma.order.findUnique({
+        where: { id: orderId },
+        select: { customer: { select: { userId: true } } },
+      });
+      if (customer) {
+        await this.notificationsService.notify({
+          userId: customer.customer.userId,
+          type: 'payment.status',
+          title: 'Payment confirmed',
+          message: `Your ${kind === PaymentKind.DEPOSIT ? 'deposit' : 'final payment'} for order ${balance.order.bookingCode} was confirmed.`,
+          data: { orderId, paymentId: payment.id, kind, status: requestedStatus },
+        });
+      }
     }
     return payment;
   }
@@ -355,6 +376,20 @@ export class PaymentsService {
       description: `Webhook from ${provider} set status ${status}`,
       metadata: { provider, transactionReference: event.transactionReference },
     });
+
+    const customer = await this.prisma.order.findUnique({
+      where: { id: payment.orderId },
+      select: { bookingCode: true, customer: { select: { userId: true } } },
+    });
+    if (customer) {
+      await this.notificationsService.notify({
+        userId: customer.customer.userId,
+        type: 'payment.status',
+        title: 'Payment update',
+        message: `Payment for order ${customer.bookingCode} is now ${status.toLowerCase()}.`,
+        data: { orderId: payment.orderId, paymentId: payment.id, kind: payment.kind, status },
+      });
+    }
     return updated;
   }
 

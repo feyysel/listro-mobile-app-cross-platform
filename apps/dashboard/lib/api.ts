@@ -86,7 +86,7 @@ export function clearSession(): void {
 
 let refreshInFlight: Promise<boolean> | null = null;
 
-async function refreshAccessToken(): Promise<boolean> {
+export async function refreshAccessToken(): Promise<boolean> {
   const refreshToken = getRefreshToken();
   if (!refreshToken) return false;
   if (refreshInFlight) return refreshInFlight;

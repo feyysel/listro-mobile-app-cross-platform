@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { RealtimeService } from '../realtime/realtime.service.js';
 
 export interface NotificationPayload {
   userId: string;
@@ -13,7 +14,10 @@ export interface NotificationPayload {
 
 @Injectable()
 export class NotificationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly realtime: RealtimeService,
+  ) {}
 
   async notify(payload: NotificationPayload) {
     const notification = await this.prisma.notification.create({
@@ -23,6 +27,20 @@ export class NotificationsService {
         title: payload.title,
         message: payload.message,
         data: (payload.data ?? {}) as object,
+      },
+    });
+
+    this.realtime.publishToUsers([payload.userId], {
+      id: `notification:${notification.id}`,
+      type: 'notification',
+      data: {
+        id: notification.id,
+        type: notification.type,
+        title: notification.title,
+        message: notification.message,
+        data: notification.data ?? {},
+        isRead: notification.isRead,
+        createdAt: notification.createdAt.toISOString(),
       },
     });
 

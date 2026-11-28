@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../realtime.dart';
 import '../roles.dart';
 import 'delivery_home_screen.dart';
 import 'home_screen.dart';
@@ -20,20 +23,40 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _index = 0;
+  int _unread = 0;
+  StreamSubscription<RealtimeEvent>? _realtimeSub;
 
   @override
   void initState() {
     super.initState();
     ApiClient.instance.sessionRevision.addListener(_handleSessionChange);
+    _realtimeSub = RealtimeClient.instance.events.listen((event) {
+      if (event.type == 'notification') _loadUnread();
+    });
+    RealtimeClient.instance.start();
+    _loadUnread();
   }
 
   @override
   void dispose() {
+    _realtimeSub?.cancel();
+    RealtimeClient.instance.stop();
     ApiClient.instance.sessionRevision.removeListener(_handleSessionChange);
     super.dispose();
   }
 
+  Future<void> _loadUnread() async {
+    if (!ApiClient.instance.isSignedIn) return;
+    try {
+      final count = await ApiClient.instance.unreadCount();
+      if (mounted) setState(() => _unread = count);
+    } catch (_) {}
+  }
+
   void _handleSessionChange() {
+    if (!ApiClient.instance.isSignedIn) {
+      RealtimeClient.instance.stop();
+    }
     if (!ApiClient.instance.isSignedIn && mounted) {
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const LoginScreen()),
@@ -70,11 +93,19 @@ class _MainShellState extends State<MainShell> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _index,
         onTap: (index) => setState(() => _index = index),
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home_rounded), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.receipt_long_rounded), label: 'Orders'),
-          BottomNavigationBarItem(icon: Icon(Icons.notifications_rounded), label: 'Updates'),
-          BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: 'Profile'),
+        items: [
+          const BottomNavigationBarItem(icon: Icon(Icons.home_rounded), label: 'Home'),
+          const BottomNavigationBarItem(
+              icon: Icon(Icons.receipt_long_rounded), label: 'Orders'),
+          BottomNavigationBarItem(
+            icon: Badge(
+              label: Text('$_unread'),
+              isLabelVisible: _unread > 0,
+              child: const Icon(Icons.notifications_rounded),
+            ),
+            label: 'Updates',
+          ),
+          const BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: 'Profile'),
         ],
       ),
     );

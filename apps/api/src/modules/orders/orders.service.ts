@@ -479,16 +479,16 @@ export class OrdersService {
       });
     }
     const updated = await this.transition(id, OrderStatus.CONFIRMED, actor, note);
-    const managers = await this.prisma.user.findMany({
+    const pickupStaff = await this.prisma.user.findMany({
       where: {
-        role: { in: [UserRole.MANAGER, UserRole.ADMIN] },
+        role: { in: [UserRole.MANAGER, UserRole.ADMIN, UserRole.DELIVERY] },
         status: 'ACTIVE',
         id: { not: actor.id },
       },
       select: { id: true },
     });
     await this.notificationsService.notifyMany(
-      managers.map((user) => user.id),
+      pickupStaff.map((user) => user.id),
       {
         type: 'order.confirmed',
         title: 'Order confirmed - pickup needed',

@@ -4,6 +4,7 @@ import { CheckCircle2, Droplets, Play, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Card, Empty, Loader, StatusBadge, Toast, dateTime } from '@/components/ui';
 import { api, getStoredUser, patch, post } from '@/lib/api';
+import { useLiveRefresh } from '@/lib/realtime';
 import type { Role, SessionUser, WashingTask } from '@/lib/types';
 
 const tabs = ['ALL', 'PENDING', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED'];
@@ -27,7 +28,7 @@ export default function WashingPage() {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const path = isManager ? '/operations/washing-tasks/center' : '/operations/washing-tasks/my';
+      const path = isManager ? '/washing-tasks/center' : '/washing-tasks/my';
       const result = await api<WashingTask[]>(path);
       setTasks(result);
     } catch (error) {
@@ -54,6 +55,8 @@ export default function WashingPage() {
         .catch(() => setOperators([]));
     }
   }, [refresh, isManager]);
+
+  useLiveRefresh(refresh);
 
   async function update(taskId: string, nextStatus: string, message: string) {
     try {

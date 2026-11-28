@@ -17,6 +17,7 @@ import { OrderDrawer } from '@/components/OrderDrawer';
 import { MiniBars, RevenueChart, StatusDonut } from '@/components/Charts';
 import { Card, dateTime, Empty, Loader, money, StatusBadge, StatCard, Toast } from '@/components/ui';
 import { api, getStoredUser } from '@/lib/api';
+import { useLiveRefresh } from '@/lib/realtime';
 import type {
   DashboardMetrics,
   OrderSummary,
@@ -116,9 +117,11 @@ export default function DashboardPage() {
 
   useEffect(() => {
     void refresh();
-    const timer = window.setInterval(() => void refresh(true), 30000);
+    const timer = window.setInterval(() => void refresh(true), 15000);
     return () => window.clearInterval(timer);
   }, [refresh]);
+
+  useLiveRefresh(() => refresh(true));
 
   const activeOrders = metrics
     ? Object.entries(metrics.orderCounts)

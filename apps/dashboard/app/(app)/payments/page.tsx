@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { RevenueChart } from '@/components/Charts';
 import { Card, Empty, Loader, money, StatusBadge, Toast, dateTime } from '@/components/ui';
 import { api, post } from '@/lib/api';
+import { useLiveRefresh } from '@/lib/realtime';
 import type { PaymentRecord } from '@/lib/types';
 
 export default function PaymentsPage() {
@@ -37,6 +38,8 @@ export default function PaymentsPage() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useLiveRefresh(refresh);
 
   async function verify(id: string) {
     try {

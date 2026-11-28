@@ -1,8 +1,9 @@
 'use client';
 
-import { Check, CircleCheck, Clock3, Package, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Check, CircleCheck, Clock3, Package, Star, X } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 import { api, getStoredUser, patch, post } from '@/lib/api';
+import { useLiveRefresh } from '@/lib/realtime';
 import type { OrderDetail, Role, SessionUser } from '@/lib/types';
 import { Card, dateTime, Empty, money, StatusBadge } from './ui';
 
@@ -10,6 +11,21 @@ interface Employee {
   id: string;
   role: string;
   name: string;
+}
+
+interface PaymentRequirements {
+  depositRequired: number;
+  depositPaid: number;
+  depositMissing: number;
+  depositComplete: boolean;
+  outstanding: number;
+  fullyPaid: boolean;
+  status: string;
+}
+
+interface RatingRecord {
+  score: number;
+  comment: string | null;
 }
 
 export function OrderDrawer({
@@ -24,18 +40,43 @@ export function OrderDrawer({
   notify: (message: string, error?: boolean) => void;
 }) {
   const [order, setOrder] = useState<OrderDetail | null>(null);
+  const [requirements, setRequirements] = useState<PaymentRequirements | null>(null);
+  const [rating, setRating] = useState<RatingRecord | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedDriver, setSelectedDriver] = useState('');
+  const [selectedReturnDriver, setSelectedReturnDriver] = useState('');
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('BANK_TRANSFER');
+  const [paymentReference, setPaymentReference] = useState('');
+  const [score, setScore] = useState(5);
+  const [comment, setComment] = useState('');
   const [busy, setBusy] = useState(false);
   const user = getStoredUser<SessionUser>();
   const role = user?.role as Role | undefined;
   const isManager = role === 'MANAGER' || role === 'ADMIN';
   const isOperator = role === 'OPERATOR' || isManager;
+  const isCustomer = role === 'CUSTOMER';
+
+  const load = useCallback(async () => {
+    if (!orderId) return;
+    try {
+      const [detail, paymentStatus, existingRating] = await Promise.all([
+        api<OrderDetail>(`/orders/${orderId}`),
+        api<PaymentRequirements>(`/orders/${orderId}/payment-requirements`),
+        api<RatingRecord | null>(`/orders/${orderId}/rating`),
+      ]);
+      setOrder(detail);
+      setRequirements(paymentStatus);
+      setRating(existingRating);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Unable to load order', true);
+    }
+  }, [orderId, notify]);
 
   useEffect(() => {
     setSelectedDriver('');
-    if (!orderId) return;
-    api<OrderDetail>(`/orders/${orderId}`).then(setOrder).catch((error) => notify(error.message, true));
+    setSelectedReturnDriver('');
+    void load();
     if (isManager) {
       api<{
         items: Array<{
@@ -55,17 +96,67 @@ export function OrderDrawer({
         )
         .catch(() => setEmployees([]));
     }
-  }, [orderId, isManager, notify]);
+  }, [load, isManager]);
+
+  useLiveRefresh(() => void load());
 
   async function run(action: () => Promise<unknown>, message: string) {
     setBusy(true);
     try {
       await action();
       notify(message);
-      if (orderId) setOrder(await api<OrderDetail>(`/orders/${orderId}`));
+      await load();
       onChanged();
     } catch (error) {
       notify(error instanceof Error ? error.message : 'Action failed', true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function recordPayment(kind: 'DEPOSIT' | 'FINAL') {
+    if (!order || !requirements) return;
+    const suggested = kind === 'DEPOSIT' ? requirements.depositMissing : requirements.outstanding;
+    const amount = paymentAmount ? Number(paymentAmount) : suggested;
+    if (!amount || amount <= 0) {
+      notify('This payment is already satisfied', true);
+      return;
+    }
+    setBusy(true);
+    try {
+      await post(`/orders/${order.id}/payments`, {
+        kind,
+        amount,
+        method: paymentMethod,
+        transactionReference: paymentReference.trim() || undefined,
+      });
+      setPaymentAmount('');
+      setPaymentReference('');
+      notify(
+        kind === 'DEPOSIT'
+          ? 'Deposit submitted for verification'
+          : 'Final payment submitted for verification',
+      );
+      await load();
+      onChanged();
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Payment failed', true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitRating() {
+    if (!order) return;
+    setBusy(true);
+    try {
+      await post(`/orders/${order.id}/rating`, { score, comment: comment.trim() || null });
+      setComment('');
+      notify('Thank you for rating the service');
+      await load();
+      onChanged();
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Rating failed', true);
     } finally {
       setBusy(false);
     }
@@ -78,6 +169,7 @@ export function OrderDrawer({
     : '';
   const driverEmployees = employees.filter((employee) => employee.role === 'DELIVERY');
   const pickupDelivery = order?.deliveries.find((delivery) => delivery.type === 'PICKUP');
+  const returnDelivery = order?.deliveries.find((delivery) => delivery.type === 'RETURN');
   const pendingPayment = order?.payments.find((payment) => payment.status === 'PENDING');
 
   return (
@@ -131,6 +223,97 @@ export function OrderDrawer({
                 ))}
               </div>
 
+              {requirements ? (
+                <div className="drawer-section">
+                  <h4>Payment status</h4>
+                  <div className="detail-grid">
+                    <div className="detail-box">
+                      <span>50% deposit</span>
+                      <strong>
+                        {money(requirements.depositPaid, order.currency)} / {money(requirements.depositRequired, order.currency)}
+                      </strong>
+                    </div>
+                    <div className="detail-box">
+                      <span>Remaining balance</span>
+                      <strong>{money(requirements.outstanding, order.currency)}</strong>
+                    </div>
+                  </div>
+                  {isCustomer && !requirements.depositComplete ? (
+                    <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                      <input
+                        className="filter-input"
+                        type="number"
+                        min={requirements.depositMissing}
+                        placeholder={`Deposit ${money(requirements.depositMissing, order.currency)}`}
+                        value={paymentAmount}
+                        onChange={(event) => setPaymentAmount(event.target.value)}
+                      />
+                      <select
+                        className="filter-input"
+                        value={paymentMethod}
+                        onChange={(event) => setPaymentMethod(event.target.value)}
+                      >
+                        <option value="TELEBIRR">Telebirr</option>
+                        <option value="CBE_BIRR">CBE Birr</option>
+                        <option value="BANK_TRANSFER">Bank transfer</option>
+                        <option value="CARD">Card</option>
+                      </select>
+                      <input
+                        className="filter-input"
+                        placeholder="Transaction reference"
+                        value={paymentReference}
+                        onChange={(event) => setPaymentReference(event.target.value)}
+                      />
+                      <button
+                        className="btn btn-primary btn-sm"
+                        disabled={busy}
+                        onClick={() => void recordPayment('DEPOSIT')}
+                      >
+                        Pay deposit
+                      </button>
+                    </div>
+                  ) : null}
+                  {isCustomer &&
+                  requirements.depositComplete &&
+                  !requirements.fullyPaid &&
+                  ['READY_FOR_DELIVERY', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(order.status) ? (
+                    <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                      <input
+                        className="filter-input"
+                        type="number"
+                        min={requirements.outstanding}
+                        placeholder={`Balance ${money(requirements.outstanding, order.currency)}`}
+                        value={paymentAmount}
+                        onChange={(event) => setPaymentAmount(event.target.value)}
+                      />
+                      <select
+                        className="filter-input"
+                        value={paymentMethod}
+                        onChange={(event) => setPaymentMethod(event.target.value)}
+                      >
+                        <option value="TELEBIRR">Telebirr</option>
+                        <option value="CBE_BIRR">CBE Birr</option>
+                        <option value="BANK_TRANSFER">Bank transfer</option>
+                        <option value="CARD">Card</option>
+                      </select>
+                      <input
+                        className="filter-input"
+                        placeholder="Transaction reference"
+                        value={paymentReference}
+                        onChange={(event) => setPaymentReference(event.target.value)}
+                      />
+                      <button
+                        className="btn btn-primary btn-sm"
+                        disabled={busy}
+                        onClick={() => void recordPayment('FINAL')}
+                      >
+                        Pay balance
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
               <div className="drawer-section">
                 <h4>Workflow history</h4>
                 <div className="timeline">
@@ -149,7 +332,7 @@ export function OrderDrawer({
                   {isManager && order.status === 'PLACED' ? (
                     <button
                       className="btn btn-primary btn-sm"
-                      disabled={busy}
+                      disabled={busy || !requirements?.depositComplete}
                       onClick={() => run(() => post(`/orders/${order.id}/confirm`, {}), 'Order confirmed')}
                     >
                       <Check size={15} /> Confirm order
@@ -202,6 +385,67 @@ export function OrderDrawer({
                         }
                       >
                         Assign pickup
+                      </button>
+                    </div>
+                  ) : null}
+                  {isManager && order.status === 'READY_FOR_DELIVERY' && !returnDelivery ? (
+                    <div style={{ width: '100%', display: 'flex', gap: 8, marginTop: 6 }}>
+                      <select
+                        className="filter-input"
+                        value={selectedReturnDriver}
+                        onChange={(event) => setSelectedReturnDriver(event.target.value)}
+                      >
+                        <option value="">Select return driver</option>
+                        {driverEmployees.map((employee) => (
+                          <option key={employee.id} value={employee.id}>{employee.name}</option>
+                        ))}
+                      </select>
+                      <button
+                        className="btn btn-primary btn-sm"
+                        disabled={!selectedReturnDriver || busy}
+                        onClick={() =>
+                          run(
+                            () =>
+                              post(`/orders/${order.id}/deliveries/return`, {
+                                employeeId: selectedReturnDriver,
+                              }),
+                            'Return delivery assigned',
+                          )
+                        }
+                      >
+                        Assign return
+                      </button>
+                    </div>
+                  ) : null}
+                  {isManager &&
+                  returnDelivery &&
+                  ['READY_FOR_DELIVERY', 'OUT_FOR_DELIVERY'].includes(order.status) ? (
+                    <div style={{ width: '100%', display: 'flex', gap: 8, marginTop: 6 }}>
+                      <select
+                        className="filter-input"
+                        value={selectedReturnDriver}
+                        onChange={(event) => setSelectedReturnDriver(event.target.value)}
+                      >
+                        <option value="">Reassign return driver</option>
+                        {driverEmployees.map((employee) => (
+                          <option key={employee.id} value={employee.id}>{employee.name}</option>
+                        ))}
+                      </select>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        disabled={!selectedReturnDriver || busy}
+                        onClick={() =>
+                          run(
+                            () =>
+                              post(`/deliveries/${returnDelivery.id}/reassign`, {
+                                employeeId: selectedReturnDriver,
+                                reason: 'Return delivery reassigned by manager',
+                              }),
+                            'Return delivery reassigned',
+                          )
+                        }
+                      >
+                        Reassign return
                       </button>
                     </div>
                   ) : null}
@@ -268,6 +512,40 @@ export function OrderDrawer({
                   ))
                 )}
               </Card>
+
+              {isCustomer && order.status === 'DELIVERED' ? (
+                <Card title="Rate this service" subtitle="Your feedback helps the team improve">
+                  {rating ? (
+                    <p className="cell-muted">You rated this order {rating.score}/5.</p>
+                  ) : (
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                      {[1, 2, 3, 4, 5].map((value) => (
+                        <button
+                          key={value}
+                          className="icon-button"
+                          aria-label={`Rate ${value} stars`}
+                          onClick={() => setScore(value)}
+                        >
+                          <Star size={18} fill={value <= score ? 'currentColor' : 'none'} />
+                        </button>
+                      ))}
+                      <input
+                        className="filter-input"
+                        placeholder="Optional comment"
+                        value={comment}
+                        onChange={(event) => setComment(event.target.value)}
+                      />
+                      <button
+                        className="btn btn-primary btn-sm"
+                        disabled={busy}
+                        onClick={() => void submitRating()}
+                      >
+                        Submit rating
+                      </button>
+                    </div>
+                  )}
+                </Card>
+              ) : null}
             </>
           )}
         </div>

@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../models.dart';
+import '../realtime.dart';
 import '../roles.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -24,6 +27,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   RatingModel? _rating;
   List<DeliveryModel> _deliveries = [];
   List<EmployeeModel> _deliveryEmployees = [];
+  StreamSubscription<RealtimeEvent>? _realtimeSub;
   String? _selectedDeliveryId;
   String? _error;
   bool _busy = false;
@@ -32,6 +36,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   void initState() {
     super.initState();
     _loading = _load();
+    _realtimeSub = RealtimeClient.instance.events.listen((event) {
+      if (event.type == 'notification') _load();
+    });
+  }
+
+  @override
+  void dispose() {
+    _realtimeSub?.cancel();
+    super.dispose();
   }
 
   bool get _isManager => AppRole.isManager(ApiClient.instance.user?.role ?? AppRole.customer);
@@ -341,7 +354,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         ),
                       ),
                     if (role == AppRole.customer &&
-                        order.status == 'DELIVERED' &&
+                        ['READY_FOR_DELIVERY', 'OUT_FOR_DELIVERY', 'DELIVERED']
+                            .contains(order.status) &&
                         requirements != null &&
                         !requirements.fullyPaid)
                       _ActionButton(
@@ -362,6 +376,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       _ActionButton(
                         label: 'Confirm order',
                         icon: Icons.check_circle_outline_rounded,
+                        enabled: requirements == null || requirements.depositComplete,
                         onPressed: () => _run(
                           () => ApiClient.instance.confirmOrder(order.id),
                           'Order confirmed',
@@ -411,7 +426,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         icon: Icons.delivery_dining_rounded,
                         onPressed: () => _run(
                           () async {
-                            await ApiClient.instance.createReturn(order.id);
+                            await ApiClient.instance.createReturn(
+                              order.id,
+                              employeeId: selectedDelivery?.id,
+                            );
                           },
                           'Delivery partner notified',
                         ),

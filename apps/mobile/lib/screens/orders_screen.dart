@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../models.dart';
+import '../realtime.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'order_detail_screen.dart';
@@ -19,6 +20,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
   late Future<void> _loading;
   final _searchController = TextEditingController();
   Timer? _searchTimer;
+  Timer? _pollTimer;
+  StreamSubscription<RealtimeEvent>? _realtimeSub;
   List<OrderModel> _orders = [];
   String _filter = 'All';
   String? _error;
@@ -31,10 +34,16 @@ class _OrdersScreenState extends State<OrdersScreen> {
     super.initState();
     _searchController.addListener(_onSearchChanged);
     _loading = _load();
+    _pollTimer = Timer.periodic(const Duration(seconds: 15), (_) => _load());
+    _realtimeSub = RealtimeClient.instance.events.listen((event) {
+      if (event.type == 'notification') _load();
+    });
   }
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
+    _realtimeSub?.cancel();
     _searchTimer?.cancel();
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
