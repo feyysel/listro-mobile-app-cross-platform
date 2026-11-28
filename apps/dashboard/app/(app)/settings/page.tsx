@@ -3,12 +3,13 @@
 import { LogOut, Server, ShieldCheck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Card } from '@/components/ui';
-import { getStoredUser, logout } from '@/lib/api';
+import { logout } from '@/lib/api';
+import { useStoredUser } from '@/lib/session';
 import type { SessionUser } from '@/lib/types';
 
 export default function SettingsPage() {
   const router = useRouter();
-  const user = getStoredUser<SessionUser>();
+  const user = useStoredUser<SessionUser>();
   const apiBase = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1';
 
   return (

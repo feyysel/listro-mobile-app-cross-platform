@@ -2,8 +2,9 @@
 
 import { Check, CircleCheck, Clock3, Package, Star, X } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { api, getStoredUser, patch, post } from '@/lib/api';
+import { api, patch, post } from '@/lib/api';
 import { useLiveRefresh } from '@/lib/realtime';
+import { useStoredUser } from '@/lib/session';
 import type { OrderDetail, Role, SessionUser } from '@/lib/types';
 import { Card, dateTime, Empty, money, StatusBadge } from './ui';
 
@@ -51,7 +52,7 @@ export function OrderDrawer({
   const [score, setScore] = useState(5);
   const [comment, setComment] = useState('');
   const [busy, setBusy] = useState(false);
-  const user = getStoredUser<SessionUser>();
+  const user = useStoredUser<SessionUser>();
   const role = user?.role as Role | undefined;
   const isManager = role === 'MANAGER' || role === 'ADMIN';
   const isOperator = role === 'OPERATOR' || isManager;

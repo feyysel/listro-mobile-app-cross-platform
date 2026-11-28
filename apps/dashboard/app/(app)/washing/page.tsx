@@ -3,8 +3,9 @@
 import { CheckCircle2, Droplets, Play, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Card, Empty, Loader, StatusBadge, Toast, dateTime } from '@/components/ui';
-import { api, getStoredUser, patch, post } from '@/lib/api';
+import { api, patch, post } from '@/lib/api';
 import { useLiveRefresh } from '@/lib/realtime';
+import { useStoredUser } from '@/lib/session';
 import type { Role, SessionUser, WashingTask } from '@/lib/types';
 
 const tabs = ['ALL', 'PENDING', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED'];
@@ -16,7 +17,7 @@ export default function WashingPage() {
   const [toast, setToast] = useState<{ message: string; error?: boolean } | null>(null);
   const [operators, setOperators] = useState<Array<{ id: string; name: string }>>([]);
   const [assignments, setAssignments] = useState<Record<string, string>>({});
-  const user = getStoredUser<SessionUser>();
+  const user = useStoredUser<SessionUser>();
   const role = user?.role as Role | undefined;
   const isManager = role === 'MANAGER' || role === 'ADMIN';
 
