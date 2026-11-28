@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -25,17 +26,27 @@ class ApiClient {
     defaultValue: 'https://listro-mobile-app-cross-platform.vercel.app/api/v1',
   );
 
+  static const String _tokenKey = 'listro_token';
+  static const String _refreshTokenKey = 'listro_refresh_token';
+  static const String _userKey = 'listro_user';
+
+  final ValueNotifier<int> sessionRevision = ValueNotifier<int>(0);
+
   String? _token;
+  String? _refreshToken;
   SessionUser? _user;
+  Future<bool>? _refreshing;
 
   String? get token => _token;
+  String? get refreshToken => _refreshToken;
   SessionUser? get user => _user;
   bool get isSignedIn => _token != null && _token!.isNotEmpty;
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
-    _token = prefs.getString('listro_token');
-    final userJson = prefs.getString('listro_user');
+    _token = prefs.getString(_tokenKey);
+    _refreshToken = prefs.getString(_refreshTokenKey);
+    final userJson = prefs.getString(_userKey);
     if (userJson != null && userJson.isNotEmpty) {
       try {
         _user = SessionUser.fromJson(jsonDecode(userJson) as Map<String, dynamic>);
@@ -43,28 +54,113 @@ class ApiClient {
         _user = null;
       }
     }
+    if (isSignedIn) {
+      try {
+        final me = await get('/me').timeout(const Duration(seconds: 8))
+            as Map<String, dynamic>;
+        await _saveSession(_token!, _refreshToken, _sessionUserFromMe(me));
+      } catch (_) {}
+    }
   }
 
-  Future<void> _saveSession(String token, dynamic user) async {
+  Map<String, dynamic> _sessionUserFromMe(Map<String, dynamic> me) {
+    final customer = me['customer'] as Map<String, dynamic>?;
+    final employee = me['employee'] as Map<String, dynamic>?;
+    final memberships = employee?['branchMemberships'] as List<dynamic>? ?? [];
+    return <String, dynamic>{
+      'id': me['id'],
+      'firstName': me['firstName'],
+      'lastName': me['lastName'],
+      'email': me['email'],
+      'role': me['role'],
+      'customerId': customer?['id'],
+      'employeeId': employee?['id'],
+      'branchIds': memberships
+          .map((item) => (item as Map<String, dynamic>)['branchId'])
+          .whereType<String>()
+          .toList(),
+    };
+  }
+
+  Future<void> _saveSession(String token, String? refreshToken, dynamic user) async {
     _token = token;
+    if (refreshToken != null && refreshToken.isNotEmpty) {
+      _refreshToken = refreshToken;
+    }
     if (user is Map<String, dynamic>) {
       _user = SessionUser.fromJson(user['user'] is Map<String, dynamic>
           ? user['user'] as Map<String, dynamic>
           : user);
-    } else {
-      _user = null;
     }
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('listro_token', token);
-    if (_user != null) await prefs.setString('listro_user', jsonEncode(_user!.toJson()));
+    await prefs.setString(_tokenKey, token);
+    if (_refreshToken != null) {
+      await prefs.setString(_refreshTokenKey, _refreshToken!);
+    }
+    if (_user != null) await prefs.setString(_userKey, jsonEncode(_user!.toJson()));
+    sessionRevision.value++;
+  }
+
+  Future<void> _clearSession() async {
+    _token = null;
+    _refreshToken = null;
+    _user = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_tokenKey);
+    await prefs.remove(_refreshTokenKey);
+    await prefs.remove(_userKey);
+    sessionRevision.value++;
+  }
+
+  Future<bool> _refreshAccessToken() async {
+    final pending = _refreshing;
+    if (pending != null) return pending;
+    final attempt = _rotateToken();
+    _refreshing = attempt;
+    try {
+      return await attempt;
+    } finally {
+      _refreshing = null;
+    }
+  }
+
+  Future<bool> _rotateToken() async {
+    final refreshToken = _refreshToken;
+    if (refreshToken == null || refreshToken.isEmpty) return false;
+    try {
+      final result = await _request(
+        'POST',
+        '/auth/refresh',
+        body: <String, String>{'refreshToken': refreshToken},
+        authenticated: false,
+        retry: false,
+      ) as Map<String, dynamic>;
+      final accessToken = result['accessToken'] as String?;
+      if (accessToken == null || accessToken.isEmpty) return false;
+      await _saveSession(accessToken, result['refreshToken'] as String?, _user?.toJson());
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<void> logout() async {
-    _token = null;
-    _user = null;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('listro_token');
-    await prefs.remove('listro_user');
+    final token = _token;
+    final refreshToken = _refreshToken;
+    if (token != null && token.isNotEmpty && refreshToken != null) {
+      try {
+        await http.post(
+          _uri('/auth/logout'),
+          headers: <String, String>{
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: jsonEncode(<String, String>{'refreshToken': refreshToken}),
+        ).timeout(const Duration(seconds: 8));
+      } catch (_) {}
+    }
+    await _clearSession();
   }
 
   Uri _uri(String path) => Uri.parse('$baseUrl$path');
@@ -103,6 +199,7 @@ class ApiClient {
     String path, {
     Object? body,
     bool authenticated = true,
+    bool retry = true,
   }) async {
     final request = http.Request(method, _uri(path))
       ..headers.addAll(_headers(authenticated: authenticated));
@@ -111,8 +208,16 @@ class ApiClient {
     final response = await http.Response.fromStream(streamed);
 
     final decoded = _decode(response);
+    final unauthorized = response.statusCode == 401;
+    if (unauthorized &&
+        authenticated &&
+        retry &&
+        !path.startsWith('/auth/') &&
+        await _refreshAccessToken()) {
+      return _request(method, path, body: body, authenticated: authenticated, retry: false);
+    }
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      if (response.statusCode == 401) await logout();
+      if (unauthorized) await _clearSession();
       throw ApiException(_message(decoded, response.statusCode), response.statusCode);
     }
     return decoded;
@@ -129,7 +234,11 @@ class ApiClient {
       body: {'email': email, 'password': password},
       authenticated: false,
     ) as Map<String, dynamic>;
-    await _saveSession(result['accessToken'] as String, result);
+    await _saveSession(
+      result['accessToken'] as String,
+      result['refreshToken'] as String?,
+      result,
+    );
   }
 
   Future<void> register({
@@ -151,7 +260,11 @@ class ApiClient {
       },
       authenticated: false,
     ) as Map<String, dynamic>;
-    await _saveSession(result['accessToken'] as String, result);
+    await _saveSession(
+      result['accessToken'] as String,
+      result['refreshToken'] as String?,
+      result,
+    );
   }
 
   Future<List<ServiceModel>> services() async {

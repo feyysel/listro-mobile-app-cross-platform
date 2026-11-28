@@ -3,7 +3,7 @@
 import { LogOut, Server, ShieldCheck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Card } from '@/components/ui';
-import { clearSession, getStoredUser } from '@/lib/api';
+import { getStoredUser, logout } from '@/lib/api';
 import type { SessionUser } from '@/lib/types';
 
 export default function SettingsPage() {
@@ -33,8 +33,7 @@ export default function SettingsPage() {
             <button
               className="btn btn-danger"
               onClick={() => {
-                clearSession();
-                router.replace('/login');
+                void logout().then(() => router.replace('/login'));
               }}
             >
               <LogOut size={16} /> Sign out

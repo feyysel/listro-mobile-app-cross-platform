@@ -21,7 +21,14 @@ import {
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { api, clearSession, getStoredUser, getToken } from '@/lib/api';
+import {
+  api,
+  getStoredUser,
+  getToken,
+  logout,
+  restoreSession,
+  SESSION_EVENT,
+} from '@/lib/api';
 import { readThemePreference, themeIsDark, toggleTheme } from '@/lib/theme';
 import type { Role, SessionUser } from '@/lib/types';
 
@@ -66,11 +73,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!getToken()) {
-      router.replace('/login');
-      return;
+    let active = true;
+    const syncSession = () => {
+      if (!getToken()) {
+        router.replace('/login');
+        return;
+      }
+      setUser(getStoredUser<SessionUser>());
+    };
+
+    syncSession();
+    window.addEventListener(SESSION_EVENT, syncSession);
+    if (getToken()) {
+      void restoreSession().then((valid) => {
+        if (active && !valid) router.replace('/login');
+      });
     }
-    setUser(getStoredUser<SessionUser>());
+
+    return () => {
+      active = false;
+      window.removeEventListener(SESSION_EVENT, syncSession);
+    };
   }, [router]);
 
   useEffect(() => {
@@ -84,9 +107,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const initials = `${user?.firstName?.[0] ?? ''}${user?.lastName?.[0] ?? ''}`.toUpperCase() || 'L';
 
-  function logout() {
-    clearSession();
-    router.replace('/login');
+  function signOut() {
+    void logout().then(() => router.replace('/login'));
   }
 
   function renderNav(items: NavItem[]) {
@@ -131,8 +153,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <div className="sidebar-footer">
           <div className="branch-chip">
-            <strong>Bole Cleaning Center</strong>
-            <span>ADDIS-01 · Addis Ababa</span>
+            <strong>Dire Dawa Cleaning Center</strong>
+            <span>DIRE-01 · Dire Dawa</span>
           </div>
         </div>
       </aside>
@@ -194,7 +216,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </div>
               ) : null}
             </div>
-            <button className="icon-button" onClick={logout} aria-label="Sign out">
+            <button className="icon-button" onClick={signOut} aria-label="Sign out">
               <LogOut size={18} />
             </button>
             <div className="profile">

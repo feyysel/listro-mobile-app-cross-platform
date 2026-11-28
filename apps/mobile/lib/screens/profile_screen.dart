@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../theme.dart';
-import 'login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -32,10 +31,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
     if (confirmed != true) return;
     await ApiClient.instance.logout();
-    if (!mounted) return;
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-    );
   }
 
   @override

@@ -15,7 +15,7 @@ import {
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { api, ApiError, setSession } from '@/lib/api';
+import { api, ApiError, getToken, setSession } from '@/lib/api';
 import { readThemePreference, themeIsDark, toggleTheme } from '@/lib/theme';
 
 interface LoginResponse {
@@ -43,7 +43,8 @@ export default function LoginPage() {
 
   useEffect(() => {
     setDark(themeIsDark(readThemePreference()));
-  }, []);
+    if (getToken()) router.replace('/dashboard');
+  }, [router]);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -54,7 +55,7 @@ export default function LoginPage() {
         method: 'POST',
         body: JSON.stringify({ email, password }),
       });
-      setSession(result.accessToken, result.user);
+      setSession(result.accessToken, result.user, result.refreshToken);
       router.replace('/dashboard');
     } catch (caught) {
       setError(
@@ -110,7 +111,7 @@ export default function LoginPage() {
         </div>
 
         <div className="login-quote">
-          Designed for modern cleaning centers · Addis Ababa · ETB
+          Designed for modern cleaning centers · Dire Dawa · ETB
         </div>
       </section>
 
